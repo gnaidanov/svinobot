@@ -223,6 +223,8 @@ async def card_info(cb: types.CallbackQuery):
 
 @dp.message(Command("addcard"))
 async def addcard(msg: types.Message):
+    print("DEBUG: NEW ADDCARD HANDLER CALLED")
+async def addcard(msg: types.Message):
     if msg.from_user.id not in ADMIN_IDS:
         await msg.answer("❌ Нет доступа.")
         return

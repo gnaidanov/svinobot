@@ -224,46 +224,92 @@ async def card_info(cb: types.CallbackQuery):
 @dp.message(Command("addcard"))
 async def addcard(msg: types.Message):
     if msg.from_user.id not in ADMIN_IDS:
+        await msg.answer("❌ Нет доступа.")
         return
 
     src = msg.reply_to_message
     if not src or not src.photo or not src.caption:
-        await msg.answer("Ответь фото с описанием карты")
+        await msg.answer(
+            "❌ Ответь командой /addcard на сообщение с фото и подписью.\n\n"
+            "Правильный формат:\n"
+            "::\n"
+            "Описание карты\n"
+            "может быть в несколько строк\n"
+            "::\n"
+            "Rare"
+        )
         return
 
-    lines = src.caption.strip().splitlines()
+    caption = src.caption.strip()
 
-    description = []
-    rarity_ru = None
-    points = currency = None
-
-    for line in lines:
-        if line.startswith("💳"):
-            description.append(line[1:].strip())
-        elif line.startswith("👑"):
-            rarity_ru = line.split(":")[-1].strip()
-        elif line.startswith("🕶"):
-            points = int("".join(filter(str.isdigit, line)))
-        elif line.startswith("🐽"):
-            currency = int("".join(filter(str.isdigit, line)))
-
-    rarity = {v: k for k, v in RARITY_RU_MAP.items()}.get(rarity_ru)
-    if not all([description, rarity, points is not None, currency is not None]):
-        await msg.answer("Ошибка парсинга карты")
+    # Ожидаем ровно два разделителя ::
+    parts = caption.split("::")
+    if len(parts) != 3:
+        await msg.answer(
+            "❌ Неверный формат подписи.\n\n"
+            "Используй:\n"
+            "::\n"
+            "Описание карты\n"
+            "::\n"
+            "Редкость"
+        )
         return
+
+    description = parts[1].strip()
+    rarity_raw = parts[2].strip()
+
+    if not description or not rarity_raw:
+        await msg.answer(
+            "❌ Описание или редкость пустые.\n\n"
+            "Пример:\n"
+            "::\n"
+            "Описание карты\n"
+            "::\n"
+            "Epic"
+        )
+        return
+
+    # Нормализация редкости
+    rarity_map = {}
+
+    for en, ru in RARITY_RU_MAP.items():
+        rarity_map[en.lower()] = en
+        rarity_map[ru.lower()] = en
+
+    rarity_key = rarity_map.get(rarity_raw.lower())
+    if not rarity_key:
+        await msg.answer(
+            "❌ Неизвестная редкость.\n\n"
+            "Доступные редкости:\n" +
+            "\n".join(
+                f"- {ru} / {en}"
+                for en, ru in RARITY_RU_MAP.items()
+            )
+        )
+        return
+
+    rarity = rarity_key  # всегда с большой буквы
+    rarity_data = RARITIES[rarity]
+
+    points = rarity_data["points"]
+    currency = rarity_data["currency"]
 
     photo = src.photo[-1]
 
     database.add_card(
-        description="\n".join(description),
+        description=description,
         rarity=rarity,
         file_id=photo.file_id,
         points=points,
         currency=currency
     )
 
-    await msg.answer("✅ Карта добавлена")
-
+    await msg.answer(
+        f"✅ Карта добавлена\n\n"
+        f"👑 Редкость: {RARITY_RU_MAP[rarity]}\n"
+        f"🕶 Очки: {points}\n"
+        f"🐽 Пяточки: {currency}"
+    )
 
 # ---------- RUN ----------
 

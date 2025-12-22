@@ -6,7 +6,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL не установлен")
 
-conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor, sslmode="require")
 cursor = conn.cursor()
 
 # ---------- TABLES ----------
@@ -79,6 +79,10 @@ def add_rewards(user_id: int, points: int, currency: int):
     conn.commit()
 
 # ---------- CARDS ----------
+
+def get_all_cards():
+    cursor.execute("SELECT * FROM cards")
+    return cursor.fetchall()
 
 def add_card(description, rarity, image, points, currency):
     cursor.execute("""

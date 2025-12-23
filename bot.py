@@ -216,7 +216,7 @@ async def show_card(cb: types.CallbackQuery):
         f"🐽 Пяточки: {card['currency']}\n"
         f"🆔 ID карты: {card['id']}"
     )
-
+    print("IMAGE =", card["image"])
     await cb.message.answer_photo(
         photo=card["image"],  # file_id
         caption=text

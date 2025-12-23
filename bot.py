@@ -175,54 +175,57 @@ async def profile(msg: types.Message):
 # ---------- COLLECTION ----------
 @dp.message(Command("collection"))
 async def collection(msg: types.Message):
-    user_id = msg.from_user.id
-    rarities = database.get_user_rarities(user_id)
-
-    if not rarities:
-        await msg.answer("📚 Твоя коллекция пуста.")
+    user_cards = database.get_collection(msg.from_user.id)
+    if not user_cards:
+        await msg.answer("Коллекция пуста.")
         return
 
+    # Определяем редкости, которые есть у пользователя
+    rarities = sorted(set(c["rarity"] for c in user_cards))
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=RARITY_RU_MAP.get(r, r),
-                    callback_data=f"user_rarity:{r}"
-                )
-            ]
+            [InlineKeyboardButton(text=RARITY_RU_MAP.get(r, r), callback_data=f"user_rarity_{r}")]
             for r in rarities
         ]
     )
+    await msg.answer("Выбери редкость:", reply_markup=kb)
 
-    await msg.answer("📚 Твоя коллекция\nВыбери редкость:", reply_markup=kb)
-
-@dp.callback_query(F.data.startswith("user_rarity:"))
-async def user_cards_by_rarity(cb: types.CallbackQuery):
-    rarity = cb.data.split(":", 1)[1]
-    user_id = cb.from_user.id
-
-    cards = database.get_user_cards_by_rarity(user_id, rarity)
+@dp.callback_query(F.data.startswith("user_rarity_"))
+async def show_user_cards_by_rarity(cb: types.CallbackQuery):
+    rarity = cb.data.split("_", 2)[2]
+    all_cards = database.get_collection(cb.from_user.id)
+    cards = [c for c in all_cards if c["rarity"] == rarity]
 
     if not cards:
-        await cb.answer("Нет карт этой редкости", show_alert=True)
+        await cb.answer("Карт этой редкости нет", show_alert=True)
         return
 
+    # Формируем кнопки с ID карт
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=f"ID {card['id']}",
-                    callback_data=f"card:{card['id']}"
-                )
-            ]
-            for card in cards
+            [InlineKeyboardButton(text=str(c["id"]), callback_data=f"user_card_{c['id']}")]
+            for c in cards
         ]
     )
+    await cb.message.answer(f"Карты редкости {RARITY_RU_MAP.get(rarity, rarity)}:", reply_markup=kb)
+    await cb.answer()
 
-    await cb.message.answer(
-        f"Карты редкости {RARITY_RU_MAP.get(rarity, rarity)}:",
-        reply_markup=kb
+@dp.callback_query(F.data.startswith("user_card_"))
+async def show_user_card_info(cb: types.CallbackQuery):
+    card_id = int(cb.data.split("_", 2)[2])
+    card = database.get_card_by_id(card_id)
+    if not card:
+        await cb.answer("Карта не найдена", show_alert=True)
+        return
+
+    text = (
+        f"💳 {card['description']}\n"
+        f"👑 Редкость: {RARITY_RU_MAP.get(card['rarity'], card['rarity'])}\n"
+        f"🕶 Очки: {card['points']}\n"
+        f"🐽 Пяточки: {card['currency']}\n"
+        f"🆔 ID карты: {card['id']}"
     )
+    await cb.message.answer_photo(photo=FSInputFile(card["image"]), caption=text)
     await cb.answer()
 
 # ---------- TOP ----------
@@ -321,15 +324,20 @@ async def addcard(msg: types.Message):
 # ---------- /CARDS ----------
 @dp.message(Command("cards"))
 async def cards(msg: types.Message):
-    all_cards = database.get_all_cards()
+    all_cards = database.get_collection(msg.from_user.id)
+    if not all_cards:
+        await msg.answer("У тебя пока нет карт.")
+        return
+
+    # Показываем редкости, которые есть у пользователя
+    rarities = sorted(set(c["rarity"] for c in all_cards))
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=ru, callback_data=f"rarity:{en}")]
-            for en, ru in RARITY_RU_MAP.items()
+            [InlineKeyboardButton(text=RARITY_RU_MAP.get(r, r), callback_data=f"user_rarity_{r}")]
+            for r in rarities
         ]
     )
     await msg.answer("Выбери редкость:", reply_markup=kb)
-
 
 @dp.callback_query(F.data.startswith("rarity:"))
 async def show_cards_by_rarity(cb: types.CallbackQuery):

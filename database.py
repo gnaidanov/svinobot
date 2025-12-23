@@ -82,6 +82,10 @@ def set_showcase(user_id: int, card_id: int):
     conn.commit()
 
 # ---------- CARDS ----------
+def get_all_cards():
+    cursor.execute("SELECT * FROM cards ORDER BY id")
+    return cursor.fetchall()
+
 def add_card(description, rarity, image, points, currency):
     cursor.execute("""
         INSERT INTO cards (description, rarity, image, points, currency)
@@ -92,13 +96,13 @@ def add_card(description, rarity, image, points, currency):
     conn.commit()
     return card_id
 
-def get_all_cards():
-    cursor.execute("SELECT * FROM cards ORDER BY id")
-    return cursor.fetchall()
-
 def get_card_by_id(card_id: int):
     cursor.execute("SELECT * FROM cards WHERE id=%s", (card_id,))
     return cursor.fetchone()
+
+def get_cards_by_rarity(rarity: str):
+    cursor.execute("SELECT * FROM cards WHERE rarity=%s ORDER BY id", (rarity,))
+    return cursor.fetchall()
 
 def get_random_card_by_rarity(rarity: str):
     if rarity == "Limited":
@@ -118,13 +122,9 @@ def get_random_card_by_rarity(rarity: str):
     return cursor.fetchone()
 
 def claim_limited(card_id: int):
-    cursor.execute(
-        "UPDATE cards SET is_claimed=TRUE WHERE id=%s",
-        (card_id,)
-    )
+    cursor.execute("UPDATE cards SET is_claimed=TRUE WHERE id=%s", (card_id,))
     conn.commit()
 
-# ---------- USER CARDS ----------
 def give_card(user_id: int, card_id: int):
     cursor.execute("""
         INSERT INTO user_cards (user_id, card_id, count)
@@ -136,12 +136,16 @@ def give_card(user_id: int, card_id: int):
 
 def get_collection(user_id: int):
     cursor.execute("""
-        SELECT c.id, c.description, c.rarity, uc.count
-        FROM user_cards uc
-        JOIN cards c ON c.id = uc.card_id
-        WHERE uc.user_id=%s
-        ORDER BY c.rarity, c.id
+        SELECT cards.id, cards.description, cards.rarity, user_cards.count
+        FROM user_cards
+        JOIN cards ON cards.id = user_cards.card_id
+        WHERE user_id=%s
+        ORDER BY cards.rarity, cards.id
     """, (user_id,))
+    return cursor.fetchall()
+
+def top_points():
+    cursor.execute("SELECT user_id, points FROM users ORDER BY points DESC LIMIT 10")
     return cursor.fetchall()
 
 def user_has_card(user_id: int, description: str):
@@ -150,14 +154,5 @@ def user_has_card(user_id: int, description: str):
         FROM user_cards uc
         JOIN cards c ON c.id = uc.card_id
         WHERE uc.user_id=%s AND c.description ILIKE %s
-        """, (user_id, f"%{description}%"))
+    """, (user_id, description))
     return cursor.fetchone()
-
-def top_points():
-    cursor.execute("""
-        SELECT user_id, points
-        FROM users
-        ORDER BY points DESC
-        LIMIT 10
-    """)
-    return cursor.fetchall()

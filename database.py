@@ -153,3 +153,29 @@ def top_points():
         LIMIT 10
     """)
     return cursor.fetchall()
+
+def get_user_cards_by_rarity(user_id: int, rarity: str):
+    cursor.execute(
+        """
+        SELECT c.*
+        FROM user_cards uc
+        JOIN cards c ON c.id = uc.card_id
+        WHERE uc.user_id = %s AND c.rarity = %s
+        ORDER BY c.id
+        """,
+        (user_id, rarity)
+    )
+    return cursor.fetchall()
+
+def get_user_rarities(user_id: int):
+    cursor.execute(
+        """
+        SELECT DISTINCT c.rarity
+        FROM user_cards uc
+        JOIN cards c ON c.id = uc.card_id
+        WHERE uc.user_id = %s
+        ORDER BY c.rarity
+        """,
+        (user_id,)
+    )
+    return [row["rarity"] for row in cursor.fetchall()]

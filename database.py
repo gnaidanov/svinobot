@@ -10,7 +10,6 @@ conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor, sslmode="re
 cursor = conn.cursor()
 
 # ---------- TABLES ----------
-
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS cards (
     id SERIAL PRIMARY KEY,
@@ -28,7 +27,8 @@ CREATE TABLE IF NOT EXISTS users (
     user_id BIGINT PRIMARY KEY,
     points INTEGER DEFAULT 0,
     currency INTEGER DEFAULT 0,
-    last_drop BIGINT DEFAULT 0
+    last_drop BIGINT DEFAULT 0,
+    showcase_card_id INTEGER DEFAULT NULL
 )
 """)
 
@@ -44,14 +44,12 @@ CREATE TABLE IF NOT EXISTS user_cards (
 conn.commit()
 
 # ---------- USERS ----------
-
 def add_user(user_id: int):
     cursor.execute(
         "INSERT INTO users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
         (user_id,)
     )
     conn.commit()
-
 
 def get_user(user_id: int):
     cursor.execute("SELECT * FROM users WHERE user_id=%s", (user_id,))
@@ -62,14 +60,12 @@ def get_user(user_id: int):
         user = cursor.fetchone()
     return user
 
-
 def update_drop_time(user_id: int):
     cursor.execute(
         "UPDATE users SET last_drop=EXTRACT(EPOCH FROM NOW())::BIGINT WHERE user_id=%s",
         (user_id,)
     )
     conn.commit()
-
 
 def add_rewards(user_id: int, points: int, currency: int):
     cursor.execute(
@@ -78,12 +74,14 @@ def add_rewards(user_id: int, points: int, currency: int):
     )
     conn.commit()
 
+def set_showcase(user_id: int, card_id: int):
+    cursor.execute(
+        "UPDATE users SET showcase_card_id=%s WHERE user_id=%s",
+        (card_id, user_id)
+    )
+    conn.commit()
+
 # ---------- CARDS ----------
-
-def get_all_cards():
-    cursor.execute("SELECT * FROM cards")
-    return cursor.fetchall()
-
 def add_card(description, rarity, image, points, currency):
     cursor.execute("""
         INSERT INTO cards (description, rarity, image, points, currency)
@@ -94,19 +92,13 @@ def add_card(description, rarity, image, points, currency):
     conn.commit()
     return card_id
 
+def get_all_cards():
+    cursor.execute("SELECT * FROM cards ORDER BY id")
+    return cursor.fetchall()
 
 def get_card_by_id(card_id: int):
     cursor.execute("SELECT * FROM cards WHERE id=%s", (card_id,))
     return cursor.fetchone()
-
-
-def get_cards_by_rarity(rarity: str):
-    cursor.execute(
-        "SELECT * FROM cards WHERE rarity=%s ORDER BY id",
-        (rarity,)
-    )
-    return cursor.fetchall()
-
 
 def get_random_card_by_rarity(rarity: str):
     if rarity == "Limited":
@@ -125,7 +117,14 @@ def get_random_card_by_rarity(rarity: str):
         """, (rarity,))
     return cursor.fetchone()
 
+def claim_limited(card_id: int):
+    cursor.execute(
+        "UPDATE cards SET is_claimed=TRUE WHERE id=%s",
+        (card_id,)
+    )
+    conn.commit()
 
+# ---------- USER CARDS ----------
 def give_card(user_id: int, card_id: int):
     cursor.execute("""
         INSERT INTO user_cards (user_id, card_id, count)
@@ -137,13 +136,22 @@ def give_card(user_id: int, card_id: int):
 
 def get_collection(user_id: int):
     cursor.execute("""
-        SELECT cards.id, cards.description, cards.rarity, user_cards.count
-        FROM user_cards
-        JOIN cards ON cards.id = user_cards.card_id
-        WHERE user_id=%s
-        ORDER BY cards.rarity, cards.id
+        SELECT c.id, c.description, c.rarity, uc.count
+        FROM user_cards uc
+        JOIN cards c ON c.id = uc.card_id
+        WHERE uc.user_id=%s
+        ORDER BY c.rarity, c.id
     """, (user_id,))
     return cursor.fetchall()
+
+def user_has_card(user_id: int, description: str):
+    cursor.execute("""
+        SELECT c.*
+        FROM user_cards uc
+        JOIN cards c ON c.id = uc.card_id
+        WHERE uc.user_id=%s AND c.description ILIKE %s
+        """, (user_id, f"%{description}%"))
+    return cursor.fetchone()
 
 def top_points():
     cursor.execute("""
@@ -153,29 +161,3 @@ def top_points():
         LIMIT 10
     """)
     return cursor.fetchall()
-
-def get_user_cards_by_rarity(user_id: int, rarity: str):
-    cursor.execute(
-        """
-        SELECT c.*
-        FROM user_cards uc
-        JOIN cards c ON c.id = uc.card_id
-        WHERE uc.user_id = %s AND c.rarity = %s
-        ORDER BY c.id
-        """,
-        (user_id, rarity)
-    )
-    return cursor.fetchall()
-
-def get_user_rarities(user_id: int):
-    cursor.execute(
-        """
-        SELECT DISTINCT c.rarity
-        FROM user_cards uc
-        JOIN cards c ON c.id = uc.card_id
-        WHERE uc.user_id = %s
-        ORDER BY c.rarity
-        """,
-        (user_id,)
-    )
-    return [row["rarity"] for row in cursor.fetchall()]

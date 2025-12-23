@@ -347,27 +347,28 @@ async def show_cards_by_rarity(cb: types.CallbackQuery):
     )
     await cb.answer()
 
-
-@dp.callback_query(F.data.startswith("card:"))
+@dp.callback_query(F.data.startswith("card_"))
 async def card_info_cb(cb: types.CallbackQuery):
-    card_id = int(cb.data.split(":", 1)[1])
+    card_id = int(cb.data.split("_", 1)[1])
     card = database.get_card_by_id(card_id)
+
     if not card:
         await cb.answer("Карта не найдена.", show_alert=True)
         return
+
     text = (
         f"💳 {card['description']}\n\n"
         f"👑 Редкость: {RARITY_RU_MAP.get(card['rarity'], card['rarity'])}\n"
         f"🕶 Очки: {card['points']}\n"
-        f"🐽 Пяточки: {card['currency']}"
-        f"🆔 ID карты: {card_obj['id']}\n"
+        f"🐽 Пяточки: {card['currency']}\n"
+        f"🆔 ID карты: {card['id']}"
     )
+
     await cb.message.answer_photo(
         photo=FSInputFile(card["image"]),
         caption=text
     )
     await cb.answer()
-
 
 # ---------- RUN ----------
 async def main():

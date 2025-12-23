@@ -1,11 +1,10 @@
-import os
 import time
 import random
 import asyncio
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from dotenv import load_dotenv
 
@@ -44,52 +43,13 @@ def get_safe_random_card():
     return None
 
 
-def cards_keyboard(cards: list[dict], page: int):
-    kb = InlineKeyboardMarkup(inline_keyboard=[])
-    start = page * CARDS_PER_PAGE
-    end = start + CARDS_PER_PAGE
-    page_cards = cards[start:end]
-
-    row = []
-    for i, card in enumerate(page_cards, start=start + 1):
-        row.append(
-            InlineKeyboardButton(
-                text=str(i),
-                callback_data=f"card:{card['id']}"
-            )
-        )
-        if len(row) == 5:
-            kb.inline_keyboard.append(row)
-            row = []
-
-    if row:
-        kb.inline_keyboard.append(row)
-
-    pages = (len(cards) - 1) // CARDS_PER_PAGE + 1
-    nav = []
-    if page > 0:
-        nav.append(
-            InlineKeyboardButton(
-                text="«",
-                callback_data=f"cards_page:{page - 1}"
-            )
-        )
-    nav.append(
-        InlineKeyboardButton(
-            text=f"{page + 1}/{pages}",
-            callback_data="noop"
-        )
+def cards_keyboard(cards: list[dict]):
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=str(c["id"]), callback_data=f"card:{c['id']}")]
+            for c in cards
+        ]
     )
-    if page < pages - 1:
-        nav.append(
-            InlineKeyboardButton(
-                text="»",
-                callback_data=f"cards_page:{page + 1}"
-            )
-        )
-    if nav:
-        kb.inline_keyboard.append(nav)
-
     return kb
 
 
@@ -119,9 +79,7 @@ async def card(msg: types.Message):
 
     if now - user["last_drop"] < DROP_COOLDOWN:
         remain = DROP_COOLDOWN - (now - user["last_drop"])
-        hours = remain // 3600
-        minutes = (remain % 3600) // 60
-        await msg.answer(f"⏳ Подожди {hours} ч. {minutes} мин.")
+        await msg.answer(f"⏳ Подожди {remain // 3600} ч. {(remain % 3600) // 60} мин.")
         return
 
     card_obj = get_safe_random_card()
@@ -136,16 +94,16 @@ async def card(msg: types.Message):
     if card_obj["rarity"] == "Limited":
         database.claim_limited(card_obj["id"])
 
-    caption = (
+    text = (
         f"💳 {card_obj['description']}\n\n"
         f"👑 Редкость: {RARITY_RU_MAP.get(card_obj['rarity'], card_obj['rarity'])}\n"
-        f"🕶 +{card_obj['points']} очков | 🐽 +{card_obj['currency']} пяточек"
-        f"\n🆔 ID карты: {card_obj['id']}\n"
+        f"🕶 +{card_obj['points']} | 🐽 +{card_obj['currency']}\n"
+        f"🆔 ID карты: {card_obj['id']}"
     )
 
     await msg.answer_photo(
-        photo=FSInputFile(card_obj["image"]),
-        caption=caption
+        photo=card_obj["image"],  # file_id
+        caption=text
     )
 
 
@@ -155,85 +113,122 @@ async def profile(msg: types.Message):
     user = database.get_user(msg.from_user.id)
     cards = database.get_collection(msg.from_user.id)
     total_cards = sum(c["count"] for c in cards)
+
     text = (
         f"👤 Профиль\n"
         f"🕶 Очки: {user['points']}\n"
         f"🐽 Пяточки: {user['currency']}\n"
         f"💳 Карточек: {total_cards}"
     )
+
     if user.get("showcase_card_id"):
-        showcase = database.get_card_by_id(user["showcase_card_id"])
-        if showcase:
+        card = database.get_card_by_id(user["showcase_card_id"])
+        if card:
             text += (
                 f"\n\n🖼 На показ:\n"
-                f"{showcase['description'].splitlines()[0][:30]} "
-                f"[{RARITY_RU_MAP.get(showcase['rarity'], showcase['rarity'])}]"
+                f"{card['description'].splitlines()[0][:30]} "
+                f"[{RARITY_RU_MAP.get(card['rarity'], card['rarity'])}]"
             )
+
     await msg.answer(text)
 
 
 # ---------- COLLECTION ----------
 @dp.message(Command("collection"))
 async def collection(msg: types.Message):
-    user_cards = database.get_collection(msg.from_user.id)
-    if not user_cards:
+    cards = database.get_collection(msg.from_user.id)
+    if not cards:
         await msg.answer("Коллекция пуста.")
         return
 
-    # Определяем редкости, которые есть у пользователя
-    rarities = sorted(set(c["rarity"] for c in user_cards))
+    rarities = sorted({c["rarity"] for c in cards})
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=RARITY_RU_MAP.get(r, r), callback_data=f"user_rarity_{r}")]
+            [InlineKeyboardButton(text=RARITY_RU_MAP[r], callback_data=f"collection:{r}")]
             for r in rarities
         ]
     )
     await msg.answer("Выбери редкость:", reply_markup=kb)
 
-@dp.callback_query(F.data.startswith("user_rarity_"))
-async def show_user_cards_by_rarity(cb: types.CallbackQuery):
-    rarity = cb.data.split("_", 2)[2]
-    all_cards = database.get_collection(cb.from_user.id)
-    cards = [c for c in all_cards if c["rarity"] == rarity]
 
-    if not cards:
-        await cb.answer("Карт этой редкости нет", show_alert=True)
-        return
+@dp.callback_query(F.data.startswith("collection:"))
+async def collection_rarity(cb: types.CallbackQuery):
+    rarity = cb.data.split(":", 1)[1]
+    cards = [
+        c for c in database.get_collection(cb.from_user.id)
+        if c["rarity"] == rarity
+    ]
 
-    # Формируем кнопки с ID карт
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=str(c["id"]), callback_data=f"user_card_{c['id']}")]
-            for c in cards
-        ]
+    await cb.message.answer(
+        f"Карты редкости {RARITY_RU_MAP.get(rarity, rarity)}:",
+        reply_markup=cards_keyboard(cards)
     )
-    await cb.message.answer(f"Карты редкости {RARITY_RU_MAP.get(rarity, rarity)}:", reply_markup=kb)
     await cb.answer()
 
-@dp.callback_query(F.data.startswith("user_card_"))
-async def show_user_card_info(cb: types.CallbackQuery):
-    card_id = int(cb.data.split("_", 2)[2])
+
+# ---------- ALL CARDS ----------
+@dp.message(Command("cards"))
+async def cards(msg: types.Message):
+    cards = database.get_all_cards()
+    if not cards:
+        await msg.answer("Карт пока нет.")
+        return
+
+    rarities = sorted({c["rarity"] for c in cards})
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=RARITY_RU_MAP[r], callback_data=f"cards:{r}")]
+            for r in rarities
+        ]
+    )
+    await msg.answer("Выбери редкость:", reply_markup=kb)
+
+
+@dp.callback_query(F.data.startswith("cards:"))
+async def cards_rarity(cb: types.CallbackQuery):
+    rarity = cb.data.split(":", 1)[1]
+    cards = [
+        c for c in database.get_all_cards()
+        if c["rarity"] == rarity
+    ]
+
+    await cb.message.answer(
+        f"Карты редкости {RARITY_RU_MAP.get(rarity, rarity)}:",
+        reply_markup=cards_keyboard(cards)
+    )
+    await cb.answer()
+
+
+# ---------- SHOW CARD ----------
+@dp.callback_query(F.data.startswith("card:"))
+async def show_card(cb: types.CallbackQuery):
+    card_id = int(cb.data.split(":", 1)[1])
     card = database.get_card_by_id(card_id)
+
     if not card:
         await cb.answer("Карта не найдена", show_alert=True)
         return
 
     text = (
-        f"💳 {card['description']}\n"
+        f"💳 {card['description']}\n\n"
         f"👑 Редкость: {RARITY_RU_MAP.get(card['rarity'], card['rarity'])}\n"
         f"🕶 Очки: {card['points']}\n"
         f"🐽 Пяточки: {card['currency']}\n"
         f"🆔 ID карты: {card['id']}"
     )
-    await cb.message.answer_photo(photo=FSInputFile(card["image"]), caption=text)
+
+    await cb.message.answer_photo(
+        photo=card["image"],  # file_id
+        caption=text
+    )
     await cb.answer()
+
 
 # ---------- TOP ----------
 @dp.message(Command("top"))
 async def top(msg: types.Message):
-    top_list = database.top_points()
     text = "🏆 Топ по очкам:\n\n"
-    for i, u in enumerate(top_list, 1):
+    for i, u in enumerate(database.top_points(), 1):
         text += f"{i}. {u['user_id']} — {u['points']}\n"
     await msg.answer(text)
 
@@ -241,15 +236,17 @@ async def top(msg: types.Message):
 # ---------- SET SHOWCASE ----------
 @dp.message(Command("setcard"))
 async def setcard(msg: types.Message):
-    description = msg.text.replace("/setcard", "").strip()
-    if not description:
-        await msg.answer("❌ Укажи описание карты.")
+    card_id = msg.text.replace("/setcard", "").strip()
+    if not card_id.isdigit():
+        await msg.answer("❌ Укажи ID карты.")
         return
-    card = database.user_has_card(msg.from_user.id, description)
+
+    card = database.user_has_card(msg.from_user.id, int(card_id))
     if not card:
         await msg.answer("❌ У тебя нет этой карты.")
         return
-    database.set_showcase(msg.from_user.id, card["id"])
+
+    database.set_showcase(msg.from_user.id, int(card_id))
     await msg.answer("✅ Карта установлена на показ.")
 
 
@@ -262,121 +259,36 @@ async def addcard(msg: types.Message):
 
     src = msg.reply_to_message
     if not src or not src.photo or not src.caption:
-        await msg.answer(
-            "❌ Ответь командой /addcard на сообщение с фото и подписью.\n\n"
-            "Правильный формат:\n"
-            "::\n"
-            "Описание карты (может быть в несколько строк)\n"
-            "::\n"
-            "Редкость (RU или EN)"
-        )
+        await msg.answer("Ответь на сообщение с фото и подписью.")
         return
 
-    caption = src.caption.strip()
-    parts = caption.split("::")
+    parts = src.caption.split("::")
     if len(parts) != 3:
-        await msg.answer(
-            "❌ Неверный формат подписи.\nИспользуй:\n"
-            "::\nОписание карты\n::\nРедкость"
-        )
+        await msg.answer("Формат:\n::\nОписание\n::\nРедкость")
         return
 
     description = parts[1].strip()
-    rarity_raw = parts[2].strip()
+    rarity_raw = parts[2].strip().lower()
 
-    if not description or not rarity_raw:
-        await msg.answer("❌ Описание или редкость пустые.")
-        return
-
-    # Нормализация редкости
     rarity_map = {v.lower(): k for k, v in RARITY_RU_MAP.items()}
-    rarity_map.update({k.lower(): k for k in RARITY_RU_MAP.keys()})
+    rarity_map.update({k.lower(): k for k in RARITY_RU_MAP})
 
-    rarity_key = rarity_map.get(rarity_raw.lower())
-    if not rarity_key:
-        await msg.answer(
-            "❌ Неизвестная редкость.\nДоступные редкости:\n" +
-            "\n".join(f"- {ru} / {en}" for en, ru in RARITY_RU_MAP.items())
-        )
+    rarity = rarity_map.get(rarity_raw)
+    if not rarity:
+        await msg.answer("Неизвестная редкость.")
         return
-
-    rarity = rarity_key
-    rarity_data = RARITIES[rarity]
-    points = rarity_data["points"]
-    currency = rarity_data["currency"]
 
     photo = src.photo[-1]
-    file = await bot.get_file(photo.file_id)
-    os.makedirs("images", exist_ok=True)
-    filename = f"{int(time.time())}_{photo.file_id}.jpg"
-    path = os.path.join("images", filename)
-    await bot.download_file(file.file_path, path)
-
-    database.add_card(description, rarity, path, points, currency)
-    await msg.answer(
-        f"✅ Карта добавлена\n"
-        f"👑 Редкость: {RARITY_RU_MAP.get(rarity, rarity)}\n"
-        f"🕶 Очки: {points}\n"
-        f"🐽 Пяточки: {currency}"
+    database.add_card(
+        description,
+        rarity,
+        photo.file_id,  # ← ВАЖНО
+        RARITIES[rarity]["points"],
+        RARITIES[rarity]["currency"]
     )
 
+    await msg.answer("✅ Карта добавлена.")
 
-# ---------- /CARDS ----------
-@dp.message(Command("cards"))
-async def cards(msg: types.Message):
-    all_cards = database.get_collection(msg.from_user.id)
-    if not all_cards:
-        await msg.answer("У тебя пока нет карт.")
-        return
-
-    # Показываем редкости, которые есть у пользователя
-    rarities = sorted(set(c["rarity"] for c in all_cards))
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=RARITY_RU_MAP.get(r, r), callback_data=f"user_rarity_{r}")]
-            for r in rarities
-        ]
-    )
-    await msg.answer("Выбери редкость:", reply_markup=kb)
-
-@dp.callback_query(F.data.startswith("rarity:"))
-async def show_cards_by_rarity(cb: types.CallbackQuery):
-    rarity = cb.data.split(":", 1)[1]
-    all_cards = database.get_all_cards()
-    cards = [c for c in all_cards if c["rarity"] == rarity]
-    if not cards:
-        await cb.message.answer("❌ Карт этой редкости пока нет.")
-        await cb.answer()
-        return
-    kb = cards_keyboard(cards, page=0)
-    await cb.message.answer(
-        f"Карты редкости {RARITY_RU_MAP.get(rarity, rarity)}:",
-        reply_markup=kb
-    )
-    await cb.answer()
-
-@dp.callback_query(F.data.startswith("card_"))
-async def card_info_cb(cb: types.CallbackQuery):
-    card_id = int(cb.data.split("_", 1)[1])
-    card = database.get_card_by_id(card_id)
-
-    if not card:
-        await cb.answer("Карта не найдена.", show_alert=True)
-        return
-
-    text = (
-        f"💳 {card['description']}\n\n"
-        f"👑 Редкость: {RARITY_RU_MAP.get(card['rarity'], card['rarity'])}\n"
-        f"🕶 Очки: {card['points']}\n"
-        f"🐽 Пяточки: {card['currency']}\n"
-        f"🆔 ID карты: {card['id']}"
-    )
-
-    await cb.message.answer_photo(
-        photo=FSInputFile(card["image"]),
-        caption=text
-    )
-    await cb.answer()
 
 # ---------- RUN ----------
 async def main():

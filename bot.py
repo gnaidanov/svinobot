@@ -16,7 +16,7 @@ import database
 # ---------- CONFIG ----------
 load_dotenv()
 
-API_TOKEN = os.getenv("BOT_TOKEN")
+API_TOKEN = os.getenv("API_TOKEN")
 
 DROP_COOLDOWN = 6 * 60 * 60  # 6 часов
 

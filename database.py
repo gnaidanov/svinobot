@@ -251,3 +251,12 @@ def top_points(limit=10):
             (limit,)
         )
         return cur.fetchall()
+
+
+def get_cards_by_rarity(rarity):
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT * FROM cards WHERE rarity=%s ORDER BY id",
+            (rarity,)
+        )
+        return cur.fetchall()

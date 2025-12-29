@@ -177,9 +177,18 @@ async def card(msg: types.Message):
     database.add_user(user_id)
     user = database.get_user(user_id)
 
-    if now - user["last_drop"] < DROP_COOLDOWN:
-        await msg.answer("⏳ Подожди перед следующим дропом.")
+    remaining = DROP_COOLDOWN - (now - user["last_drop"])
+    if remaining > 0:
+        hours = remaining // 3600
+        minutes = (remaining % 3600) // 60
+        seconds = remaining % 60
+
+        await msg.answer(
+            "⏳ Ты уже получал карту.\n"
+            f"⏱ Осталось ждать: {hours:02d}:{minutes:02d}:{seconds:02d}"
+        )
         return
+
 
     card_obj = get_safe_random_card()
     if not card_obj:
@@ -317,9 +326,22 @@ async def profile(msg: types.Message):
 # ---------- TOP ----------
 @dp.message(Command("top"))
 async def top(msg: types.Message):
-    top_list = database.top_points()
-    text = "🏆 Топ:\n\n" + "\n".join(f"{i+1}. {u['user_id']} — {u['points']}" for i, u in enumerate(top_list))
-    await msg.answer(text)
+    rows = database.top_points()
+    lines = []
+
+    for i, row in enumerate(rows, start=1):
+        user_id = row["user_id"]
+        points = row["points"]
+
+        try:
+            chat = await bot.get_chat(user_id)
+            name = f"@{chat.username}" if chat.username else str(user_id)
+        except Exception:
+            name = str(user_id)
+
+        lines.append(f"{i}. {name} — {points}")
+
+    await msg.answer("🏆 Топ:\n\n" + "\n".join(lines))
 
 # ---------- RUN ----------
 async def main():

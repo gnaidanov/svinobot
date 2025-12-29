@@ -12,13 +12,7 @@ from aiogram.fsm.state import State, StatesGroup
 from dotenv import load_dotenv
 
 import database
-from config import (
-    API_TOKEN,
-    DROP_COOLDOWN,
-    RARITIES,
-    RARITY_RU_MAP,
-    ADMIN_IDS
-)
+from config import API_TOKEN, DROP_COOLDOWN, RARITIES, RARITY_RU_MAP, ADMIN_IDS
 
 # ---------- INIT ----------
 load_dotenv()
@@ -27,11 +21,9 @@ dp = Dispatcher()
 
 CARDS_PER_PAGE = 25
 
-
 # ---------- FSM ----------
 class AddCardState(StatesGroup):
     waiting_for_photo = State()
-
 
 # ---------- UTILS ----------
 def roll_rarity():
@@ -49,11 +41,13 @@ def get_safe_random_card():
     return None
 
 
-def rarity_keyboard(prefix: str):
+def rarity_keyboard(prefix: str, rarities=None):
+    if rarities is None:
+        rarities = list(RARITIES.keys())
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=RARITY_RU_MAP[r], callback_data=f"{prefix}:{r}")]
-            for r in RARITIES.keys()
+            [InlineKeyboardButton(text=RARITY_RU_MAP.get(r, r), callback_data=f"{prefix}:{r}")]
+            for r in rarities
         ]
     )
 
@@ -88,7 +82,6 @@ def cards_keyboard(cards, page: int, prefix: str):
 
     return kb
 
-
 # ---------- START ----------
 @dp.message(Command("start"))
 async def start(msg: types.Message):
@@ -105,15 +98,15 @@ async def start(msg: types.Message):
         "/del — удалить карту"
     )
 
-
 # ---------- ADD CARD ----------
 @dp.message(Command("addcard"))
 async def addcard(msg: types.Message):
     if msg.from_user.id not in ADMIN_IDS:
+        await msg.answer("❌ Нет доступа.")
         return
 
     if not msg.reply_to_message or not msg.reply_to_message.photo:
-        await msg.answer("❌ Ответь командой /addcard на сообщение с фото карты.")
+        await msg.answer("❌ Ответь на сообщение с фото карты.")
         return
 
     caption = msg.reply_to_message.caption
@@ -157,7 +150,6 @@ async def addcard(msg: types.Message):
 
     await msg.answer("✅ Карта добавлена.")
 
-
 # ---------- CARD DROP ----------
 @dp.message(Command("card"))
 async def card(msg: types.Message):
@@ -171,104 +163,84 @@ async def card(msg: types.Message):
         await msg.answer("⏳ Подожди перед следующим дропом.")
         return
 
-    card = get_safe_random_card()
-    if not card:
+    card_obj = get_safe_random_card()
+    if not card_obj:
         await msg.answer("❌ Нет карт.")
         return
 
-    database.give_card(user_id, card["id"])
-    database.add_rewards(user_id, card["points"], card["currency"])
+    database.give_card(user_id, card_obj["id"])
+    database.add_rewards(user_id, card_obj["points"], card_obj["currency"])
     database.update_drop_time(user_id)
 
     await msg.answer_photo(
-        photo=card["image"],
+        photo=card_obj["image"],
         caption=(
-            f"💳 {card['description']}\n\n"
-            f"👑 {RARITY_RU_MAP.get(card['rarity'])}\n"
-            f"+{card['points']} очков | +{card['currency']} пяточек\n\n"
-            f"🆔 ID: {card['id']}"
+            f"💳 {card_obj['description']}\n\n"
+            f"👑 {RARITY_RU_MAP.get(card_obj['rarity'])}\n"
+            f"+{card_obj['points']} очков | +{card_obj['currency']} пяточек\n\n"
+            f"🆔 ID: {card_obj['id']}"
         )
     )
-
 
 # ---------- CARDS ----------
 @dp.message(Command("cards"))
 async def cards(msg: types.Message):
     await msg.answer("Выбери редкость:", reply_markup=rarity_keyboard("cards"))
 
-
 @dp.callback_query(F.data.startswith("cards:"))
 async def cards_by_rarity(cb: types.CallbackQuery):
     rarity = cb.data.split(":")[1]
-    cards = database.get_cards_by_rarity(rarity)
-    if not cards:
+    cards_list = database.get_cards_by_rarity(rarity)
+    if not cards_list:
         await cb.message.answer("Нет карт этой редкости.")
         return
     await cb.message.answer(
-        f"Карты ({RARITY_RU_MAP[rarity]}):",
-        reply_markup=cards_keyboard(cards, 0, "cards")
+        f"Карты ({RARITY_RU_MAP.get(rarity, rarity)}):",
+        reply_markup=cards_keyboard(cards_list, 0, "cards")
     )
-
 
 @dp.callback_query(F.data.startswith("cards_card:"))
 async def show_card(cb: types.CallbackQuery):
     card_id = int(cb.data.split(":")[1])
-    card = database.get_card_by_id(card_id)
+    card_obj = database.get_card_by_id(card_id)
+    if not card_obj:
+        await cb.message.answer("❌ Карта не найдена.")
+        return
     await cb.message.answer_photo(
-        photo=card["image"],
+        photo=card_obj["image"],
         caption=(
-            f"💳 {card['description']}\n\n"
-            f"👑 {RARITY_RU_MAP.get(card['rarity'])}\n"
-            f"+{card['points']} | +{card['currency']}\n\n"
-            f"🆔 ID: {card['id']}"
+            f"💳 {card_obj['description']}\n\n"
+            f"👑 {RARITY_RU_MAP.get(card_obj['rarity'])}\n"
+            f"+{card_obj['points']} | +{card_obj['currency']}\n\n"
+            f"🆔 ID: {card_obj['id']}"
         )
     )
-
 
 # ---------- COLLECTION ----------
 @dp.message(Command("collection"))
 async def collection(msg: types.Message):
     user_id = msg.from_user.id
-    cards = database.get_collection(user_id)
-
-    if not cards:
+    user_cards = database.get_collection(user_id)
+    if not user_cards:
         await msg.answer("Коллекция пуста.")
         return
 
-    rarities = sorted({c["rarity"] for c in cards})
-
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(
-                text=RARITY_RU_MAP.get(r, r),
-                callback_data=f"col:{r}"
-            )]
-            for r in rarities
-        ]
-    )
-
+    rarities = sorted({c["rarity"] for c in user_cards})
+    kb = rarity_keyboard("col", rarities)
     await msg.answer("Выбери редкость:", reply_markup=kb)
-
 
 @dp.callback_query(F.data.startswith("col:"))
 async def collection_by_rarity(cb: types.CallbackQuery):
     rarity = cb.data.split(":")[1]
     user_id = cb.from_user.id
-
-    cards = [
-        c for c in database.get_collection(user_id)
-        if c["rarity"] == rarity
-    ]
-
-    if not cards:
+    cards_list = [c for c in database.get_collection(user_id) if c["rarity"] == rarity]
+    if not cards_list:
         await cb.message.answer("Нет карт этой редкости.")
         return
-
     await cb.message.answer(
         f"Твои карты ({RARITY_RU_MAP.get(rarity, rarity)}):",
-        reply_markup=cards_keyboard(cards, 0, "col")
+        reply_markup=cards_keyboard(cards_list, 0, "col")
     )
-
 
 # ---------- SETCARD ----------
 @dp.message(Command("setcard"))
@@ -277,11 +249,16 @@ async def setcard(msg: types.Message):
         await msg.answer("❌ Ответь на сообщение с картой.")
         return
 
+    card_id = None
     for line in msg.reply_to_message.caption.splitlines():
         if line.startswith("🆔"):
-            card_id = int(line.split(":")[1])
+            try:
+                card_id = int(line.split(":")[1])
+            except Exception:
+                pass
             break
-    else:
+
+    if not card_id:
         await msg.answer("❌ Не найден ID карты.")
         return
 
@@ -289,14 +266,14 @@ async def setcard(msg: types.Message):
         await msg.answer("❌ У тебя нет этой карты.")
         return
 
-    database.set_showcase(msg.from_user.id, card_id)
+    database.set_showcase_card(msg.from_user.id, card_id)
     await msg.answer("✅ Карта установлена на показ.")
-
 
 # ---------- DEL ----------
 @dp.message(Command("del"))
 async def delete_card(msg: types.Message):
     if msg.from_user.id not in ADMIN_IDS:
+        await msg.answer("❌ Нет доступа.")
         return
     try:
         card_id = int(msg.text.split()[1])
@@ -306,14 +283,12 @@ async def delete_card(msg: types.Message):
     database.delete_card(card_id)
     await msg.answer("🗑 Карта удалена.")
 
-
 # ---------- PROFILE ----------
 @dp.message(Command("profile"))
 async def profile(msg: types.Message):
     user_id = msg.reply_to_message.from_user.id if msg.reply_to_message else msg.from_user.id
     user = database.get_user(user_id)
     cards = database.get_collection(user_id)
-
     await msg.answer(
         f"👤 Профиль\n"
         f"🕶 Очки: {user['points']}\n"
@@ -321,22 +296,17 @@ async def profile(msg: types.Message):
         f"💳 Карточек: {sum(c['count'] for c in cards)}"
     )
 
-
 # ---------- TOP ----------
 @dp.message(Command("top"))
 async def top(msg: types.Message):
-    top = database.top_points()
-    await msg.answer(
-        "🏆 Топ:\n\n" +
-        "\n".join(f"{i+1}. {u['user_id']} — {u['points']}" for i, u in enumerate(top))
-    )
-
+    top_list = database.top_points()
+    text = "🏆 Топ:\n\n" + "\n".join(f"{i+1}. {u['user_id']} — {u['points']}" for i, u in enumerate(top_list))
+    await msg.answer(text)
 
 # ---------- RUN ----------
 async def main():
     database.init_db()
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -13,7 +13,6 @@ conn.autocommit = True
 # ---------- INIT ----------
 def init_db():
     with conn.cursor() as cur:
-        # USERS
         cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id BIGINT PRIMARY KEY,
@@ -24,7 +23,6 @@ def init_db():
         );
         """)
 
-        # CARDS
         cur.execute("""
         CREATE TABLE IF NOT EXISTS cards (
             id SERIAL PRIMARY KEY,
@@ -36,7 +34,6 @@ def init_db():
         );
         """)
 
-        # USER CARDS
         cur.execute("""
         CREATE TABLE IF NOT EXISTS user_cards (
             user_id BIGINT NOT NULL,
@@ -170,10 +167,7 @@ def give_card(user_id: int, card_id: int):
 def user_has_card(user_id: int, card_id: int) -> bool:
     with conn.cursor() as cur:
         cur.execute(
-            """
-            SELECT 1 FROM user_cards
-            WHERE user_id = %s AND card_id = %s
-            """,
+            "SELECT 1 FROM user_cards WHERE user_id = %s AND card_id = %s",
             (user_id, card_id)
         )
         return cur.fetchone() is not None
@@ -183,14 +177,7 @@ def get_collection(user_id: int):
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT
-                c.id,
-                c.description,
-                c.image,
-                c.rarity,
-                c.points,
-                c.currency,
-                uc.count
+            SELECT c.*, uc.count
             FROM user_cards uc
             JOIN cards c ON c.id = uc.card_id
             WHERE uc.user_id = %s
@@ -205,14 +192,7 @@ def get_collection_by_rarity(user_id: int, rarity: str, limit=25, offset=0):
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT
-                c.id,
-                c.description,
-                c.image,
-                c.rarity,
-                c.points,
-                c.currency,
-                uc.count
+            SELECT c.*, uc.count
             FROM user_cards uc
             JOIN cards c ON c.id = uc.card_id
             WHERE uc.user_id = %s AND c.rarity = %s
@@ -249,14 +229,5 @@ def top_points(limit=10):
             LIMIT %s
             """,
             (limit,)
-        )
-        return cur.fetchall()
-
-
-def get_cards_by_rarity(rarity):
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT * FROM cards WHERE rarity=%s ORDER BY id",
-            (rarity,)
         )
         return cur.fetchall()

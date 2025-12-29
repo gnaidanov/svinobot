@@ -74,13 +74,31 @@ def cards_keyboard(cards, page: int, prefix: str):
     pages = (len(cards) - 1) // CARDS_PER_PAGE + 1
     nav = []
     if page > 0:
-        nav.append(InlineKeyboardButton("«", callback_data=f"{prefix}_page:{page-1}"))
-    nav.append(InlineKeyboardButton(f"{page+1}/{pages}", callback_data="noop"))
-    if page < pages - 1:
-        nav.append(InlineKeyboardButton("»", callback_data=f"{prefix}_page:{page+1}"))
-    kb.inline_keyboard.append(nav)
+        nav.append(
+            InlineKeyboardButton(
+                text="«",
+                callback_data=f"{prefix}_page:{page-1}"
+            )
+        )
 
+    nav.append(
+        InlineKeyboardButton(
+            text=f"{page+1}/{pages}",
+            callback_data="noop"
+        )
+    )
+
+    if page < pages - 1:
+        nav.append(
+            InlineKeyboardButton(
+                text="»",
+                callback_data=f"{prefix}_page:{page+1}"
+            )
+        )
+
+    kb.inline_keyboard.append(nav)
     return kb
+
 
 # ---------- START ----------
 @dp.message(Command("start"))

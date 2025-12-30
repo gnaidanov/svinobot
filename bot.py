@@ -16,7 +16,7 @@ from config import API_TOKEN, DROP_COOLDOWN, RARITIES, RARITY_RU_MAP, ADMIN_IDS
 
 # ---------- INIT ----------
 load_dotenv()
-bot = Bot(API_TOKEN)
+bot = Bot(API_TOKEN, request_timeout=60)
 dp = Dispatcher()
 
 CARDS_PER_PAGE = 25

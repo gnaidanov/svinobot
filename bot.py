@@ -204,7 +204,8 @@ async def card(msg: types.Message):
         caption=(
             f"💳 {card_obj['description']}\n\n"
             f"👑 {RARITY_RU_MAP.get(card_obj['rarity'])}\n"
-            f"+{card_obj['points']} очков | +{card_obj['currency']} пяточек\n\n"
+            f"🕶️ +{card_obj['points']} очков\n"
+            f"🐽 +{card_obj['currency']} пятачков\n\n"
             f"🆔 ID: {card_obj['id']}"
         )
     )
@@ -238,7 +239,8 @@ async def show_card(cb: types.CallbackQuery):
         caption=(
             f"💳 {card_obj['description']}\n\n"
             f"👑 {RARITY_RU_MAP.get(card_obj['rarity'])}\n"
-            f"+{card_obj['points']} | +{card_obj['currency']}\n\n"
+            f"🕶️ +{card_obj['points']} очков\n"
+            f"🐽 +{card_obj['currency']} пятачков\n\n"
             f"🆔 ID: {card_obj['id']}"
         )
     )

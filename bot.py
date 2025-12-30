@@ -184,7 +184,7 @@ async def card(msg: types.Message):
         seconds = remaining % 60
 
         await msg.answer(
-            "⏳ Ты уже получал карту.\n"
+            "⏳ Ты уже получал(а) карту.\n"
             f"⏱ Осталось ждать: {hours:02d}:{minutes:02d}:{seconds:02d}"
         )
         return

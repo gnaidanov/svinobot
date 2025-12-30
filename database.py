@@ -82,12 +82,16 @@ def add_rewards(user_id: int, points: int, currency: int):
         )
 
 
-def set_showcase_card(user_id: int, card_id: int):
-    with conn.cursor() as cur:
+def set_showcase_card(user_id, card_id):
+    try:
         cur.execute(
             "UPDATE users SET showcase_card_id = %s WHERE user_id = %s",
             (card_id, user_id)
         )
+        conn.commit()
+    except Exception as e:
+        print("DB error in set_showcase_card:", e)
+        conn.rollback()
 
 
 # ---------- CARDS ----------

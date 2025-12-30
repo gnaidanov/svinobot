@@ -1,10 +1,13 @@
 import time
 import random
+import os
 import asyncio
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiohttp import web
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -364,9 +367,22 @@ async def top(msg: types.Message):
     await msg.answer("🏆 Топ:\n\n" + "\n".join(lines))
 
 # ---------- RUN ----------
-async def main():
+def main():
     database.init_db()
-    await dp.start_polling(bot)
+    app = web.Application()
+    app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
+
+    SimpleRequestHandler(
+        dispatcher=dp,
+        bot=bot,
+    ).register(app, path=WEBHOOK_PATH)
+
+    web.run_app(
+        app,
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", 8080)),
+    )
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

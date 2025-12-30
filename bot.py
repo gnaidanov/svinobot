@@ -335,7 +335,14 @@ async def top(msg: types.Message):
 
         try:
             chat = await bot.get_chat(user_id)
-            name = f"@{chat.username}" if chat.username else str(user_id)
+
+            if chat.first_name:
+                name = chat.first_name
+                if chat.last_name:
+                    name += f" {chat.last_name}"
+            else:
+                name = str(user_id)
+
         except Exception:
             name = str(user_id)
 

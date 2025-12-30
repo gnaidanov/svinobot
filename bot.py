@@ -316,14 +316,25 @@ async def delete_card(msg: types.Message):
 @dp.message(Command("profile"))
 async def profile(msg: types.Message):
     user_id = msg.reply_to_message.from_user.id if msg.reply_to_message else msg.from_user.id
+
     user = database.get_user(user_id)
     cards = database.get_collection(user_id)
-    await msg.answer(
+    showcase_card = database.get_showcase_card(user_id)
+
+    caption = (
         f"👤 Профиль\n"
         f"🕶 Очки: {user['points']}\n"
         f"🐽 Пяточки: {user['currency']}\n"
         f"💳 Карточек: {sum(c['count'] for c in cards)}"
     )
+
+    if showcase_card:
+        await msg.answer_photo(
+            photo=showcase_card["file_id"],
+            caption=caption
+        )
+    else:
+        await msg.answer(caption)
 
 # ---------- TOP ----------
 @dp.message(Command("top"))

@@ -1,13 +1,10 @@
 import time
 import random
-import os
 import asyncio
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from aiohttp import web
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -19,7 +16,7 @@ from config import API_TOKEN, DROP_COOLDOWN, RARITIES, RARITY_RU_MAP, ADMIN_IDS
 
 # ---------- INIT ----------
 load_dotenv()
-bot = Bot(API_TOKEN, request_timeout=60)
+bot = Bot(API_TOKEN)
 dp = Dispatcher()
 
 CARDS_PER_PAGE = 25
@@ -101,7 +98,6 @@ def cards_keyboard(cards, page: int, prefix: str):
 
     kb.inline_keyboard.append(nav)
     return kb
-
 
 # ---------- START ----------
 @dp.message(Command("start"))
@@ -187,11 +183,10 @@ async def card(msg: types.Message):
         seconds = remaining % 60
 
         await msg.answer(
-            "⏳ Ты уже получал(а) карту.\n"
+            "⏳ Ты уже получал карту.\n"
             f"⏱ Осталось ждать: {hours:02d}:{minutes:02d}:{seconds:02d}"
         )
         return
-
 
     card_obj = get_safe_random_card()
     if not card_obj:
@@ -207,8 +202,7 @@ async def card(msg: types.Message):
         caption=(
             f"💳 {card_obj['description']}\n\n"
             f"👑 {RARITY_RU_MAP.get(card_obj['rarity'])}\n"
-            f"🕶️ +{card_obj['points']} очков\n"
-            f"🐽 +{card_obj['currency']} пятачков\n\n"
+            f"+{card_obj['points']} очков | +{card_obj['currency']} пяточек\n\n"
             f"🆔 ID: {card_obj['id']}"
         )
     )
@@ -242,8 +236,7 @@ async def show_card(cb: types.CallbackQuery):
         caption=(
             f"💳 {card_obj['description']}\n\n"
             f"👑 {RARITY_RU_MAP.get(card_obj['rarity'])}\n"
-            f"🕶️ +{card_obj['points']} очков\n"
-            f"🐽 +{card_obj['currency']} пятачков\n\n"
+            f"+{card_obj['points']} | +{card_obj['currency']}\n\n"
             f"🆔 ID: {card_obj['id']}"
         )
     )
@@ -319,25 +312,14 @@ async def delete_card(msg: types.Message):
 @dp.message(Command("profile"))
 async def profile(msg: types.Message):
     user_id = msg.reply_to_message.from_user.id if msg.reply_to_message else msg.from_user.id
-
     user = database.get_user(user_id)
     cards = database.get_collection(user_id)
-    showcase_card = database.get_showcase_card(user_id)
-
-    caption = (
+    await msg.answer(
         f"👤 Профиль\n"
         f"🕶 Очки: {user['points']}\n"
         f"🐽 Пяточки: {user['currency']}\n"
         f"💳 Карточек: {sum(c['count'] for c in cards)}"
     )
-
-    if showcase_card:
-        await msg.answer_photo(
-            photo=showcase_card["file_id"],
-            caption=caption
-        )
-    else:
-        await msg.answer(caption)
 
 # ---------- TOP ----------
 @dp.message(Command("top"))
@@ -367,22 +349,9 @@ async def top(msg: types.Message):
     await msg.answer("🏆 Топ:\n\n" + "\n".join(lines))
 
 # ---------- RUN ----------
-def main():
+async def main():
     database.init_db()
-    app = web.Application()
-    app.on_startup.append(on_startup)
-    app.on_shutdown.append(on_shutdown)
-
-    SimpleRequestHandler(
-        dispatcher=dp,
-        bot=bot,
-    ).register(app, path=WEBHOOK_PATH)
-
-    web.run_app(
-        app,
-        host="0.0.0.0",
-        port=int(os.getenv("PORT", 8080)),
-    )
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

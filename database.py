@@ -19,7 +19,7 @@ def init_db():
             points INTEGER DEFAULT 0,
             currency INTEGER DEFAULT 0,
             last_drop BIGINT DEFAULT 0,
-            showcase_card_id INTEGER
+            showcase_card_id INTEGER DEFAULT NULL
         );
         """)
 

@@ -235,3 +235,12 @@ def top_points(limit=10):
             (limit,)
         )
         return cur.fetchall()
+
+def get_showcase_card(user_id: int):
+    cur.execute("""
+        SELECT c.*
+        FROM cards c
+        JOIN users u ON u.showcase_card_id = c.id
+        WHERE u.user_id = %s
+    """, (user_id,))
+    return cur.fetchone()

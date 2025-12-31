@@ -319,25 +319,23 @@ async def profile(msg: types.Message):
         return
 
     cards = database.get_collection(user_id)
-    cards_count = sum(c["count"] for c in cards)
+    total_cards = sum(c["count"] for c in cards)
 
     caption = (
-        f"👤 Профиль\n"
+        "👤 Профиль\n"
         f"🕶 Очки: {user['points']}\n"
         f"🐽 Пяточки: {user['currency']}\n"
-        f"💳 Карточек: {cards_count}"
+        f"💳 Карточек: {total_cards}"
     )
 
     showcase_card = database.get_showcase_card(user_id)
 
-    # ✅ ЕСЛИ КАРТА УСТАНОВЛЕНА — ШЛЁМ ФОТО
     if showcase_card:
         await msg.answer_photo(
             photo=showcase_card["image"],
             caption=caption
         )
     else:
-        # ✅ ЕСЛИ НЕТ — ПРОСТО ТЕКСТ
         await msg.answer(caption)
 
 # ---------- TOP ----------

@@ -238,14 +238,12 @@ def top_points(limit=10):
 
 def get_showcase_card(user_id: int):
     with conn.cursor() as cur:
-        cur.execute(
-            """
+        cur.execute("""
             SELECT c.*
-            FROM cards c
-            JOIN users u ON u.showcase_card_id = c.id
+            FROM users u
+            JOIN cards c ON c.id = u.showcase_card_id
             WHERE u.user_id = %s
-            """,
-            (user_id,)
-        )
+        """, (user_id,))
         return cur.fetchone()
+
 

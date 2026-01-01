@@ -210,7 +210,6 @@ async def card(msg: types.Message):
         await msg.answer(
             "⏳ Ты уже получал карту.\n"
             f"⏱ Осталось ждать: {hours:02d}:{minutes:02d}:{seconds:02d}\n"
-            f"💬 Или напиши ещё {need} сообщений"
         )
         return
 

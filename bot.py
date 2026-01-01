@@ -202,7 +202,7 @@ async def card(msg: types.Message):
         caption=(
             f"💳 {card_obj['description']}\n\n"
             f"👑 {RARITY_RU_MAP.get(card_obj['rarity'])}\n"
-            f"+{card_obj['points']} очков | +{card_obj['currency']} пяточек\n\n"
+            f"+{card_obj['points']} 🕶 | +{card_obj['currency']} 🦶\n\n"
             f"🆔 ID: {card_obj['id']}"
         )
     )

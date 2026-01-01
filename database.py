@@ -245,5 +245,6 @@ def get_showcase_card(user_id: int):
             WHERE u.user_id = %s
         """, (user_id,))
         return cur.fetchone()
+    print("SETCARD RESULT:", cur.fetchone())
 
 

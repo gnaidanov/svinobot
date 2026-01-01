@@ -124,7 +124,7 @@ def top_keyboard():
     ])
 
 
-@dp.message()
+@dp.message(F.text)
 async def count_messages(msg: types.Message):
     if msg.text and not msg.text.startswith("/"):
         database.inc_message_counter(msg.from_user.id)
@@ -208,8 +208,8 @@ async def card(msg: types.Message):
 
     remaining = DROP_COOLDOWN - (now - user["last_drop"])
 
-    if remaining > 0 and user["msg_since_drop"] < 3:
-        need = 3 - user["msg_since_drop"]
+    if remaining > 0 and user["msg_since_drop"] < 300:
+        need = 300 - user["msg_since_drop"]
         hours = remaining // 3600
         minutes = (remaining % 3600) // 60
         seconds = remaining % 60

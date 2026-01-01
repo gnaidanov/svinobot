@@ -273,7 +273,7 @@ async def show_card(cb: types.CallbackQuery):
         caption=(
             f"💳 {card_obj['description']}\n\n"
             f"👑 {RARITY_RU_MAP.get(card_obj['rarity'])}\n"
-            f"+{card_obj['points']} | +{card_obj['currency']}\n\n"
+            f"+{card_obj['points']} 🕶 | +{card_obj['currency']} 🐽\n\n"
             f"🆔 ID: {card_obj['id']}"
         )
     )

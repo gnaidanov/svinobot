@@ -19,6 +19,7 @@ def init_db():
             points INTEGER DEFAULT 0,
             currency INTEGER DEFAULT 0,
             last_drop BIGINT DEFAULT 0,
+            msg_since_drop INTEGER DEFAULT 0,
             showcase_card_id INTEGER DEFAULT NULL
         );
         """)
@@ -89,9 +90,6 @@ def set_showcase_card(user_id, card_id):
                 "UPDATE users SET showcase_card_id = %s WHERE user_id = %s",
                 (card_id, user_id)
             )
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
 
 
 # ---------- CARDS ----------
@@ -247,7 +245,7 @@ def top_points(limit=10):
         return cur.fetchall()
 
 def top_currency(limit=10):
-    with conn.cursor(cursor_factory=DictCursor) as cur:
+    with conn.cursor() as cur:
         cur.execute("""
             SELECT user_id, currency
             FROM users
@@ -256,8 +254,9 @@ def top_currency(limit=10):
         """, (limit,))
         return cur.fetchall()
 
+
 def top_cards(limit=10):
-    with conn.cursor(cursor_factory=DictCursor) as cur:
+    with conn.cursor() as cur:
         cur.execute("""
             SELECT uc.user_id, SUM(uc.count) AS cards
             FROM user_cards uc
@@ -275,7 +274,6 @@ def reset_message_counter(user_id):
             SET msg_since_drop = 0
             WHERE user_id = %s
         """, (user_id,))
-        conn.commit()
 
 
 def inc_message_counter(user_id):
@@ -285,4 +283,3 @@ def inc_message_counter(user_id):
             SET msg_since_drop = msg_since_drop + 1
             WHERE user_id = %s
         """, (user_id,))
-        conn.commit()

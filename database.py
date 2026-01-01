@@ -222,6 +222,16 @@ def count_collection_by_rarity(user_id: int, rarity: str):
         return cur.fetchone()["count"]
 
 
+def get_showcase_card(user_id: int):
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT c.*
+            FROM users u
+            JOIN cards c ON c.id = u.showcase_card_id
+            WHERE u.user_id = %s
+        """, (user_id,))
+        return cur.fetchone()
+
 # ---------- TOP ----------
 def top_points(limit=10):
     with conn.cursor() as cur:
@@ -236,14 +246,43 @@ def top_points(limit=10):
         )
         return cur.fetchall()
 
-def get_showcase_card(user_id: int):
+def top_currency(limit=10):
+    with conn.cursor(cursor_factory=DictCursor) as cur:
+        cur.execute("""
+            SELECT user_id, currency
+            FROM users
+            ORDER BY currency DESC
+            LIMIT %s
+        """, (limit,))
+        return cur.fetchall()
+
+def top_cards(limit=10):
+    with conn.cursor(cursor_factory=DictCursor) as cur:
+        cur.execute("""
+            SELECT uc.user_id, SUM(uc.count) AS cards
+            FROM user_cards uc
+            GROUP BY uc.user_id
+            ORDER BY cards DESC
+            LIMIT %s
+        """, (limit,))
+        return cur.fetchall()
+
+
+def reset_message_counter(user_id):
     with conn.cursor() as cur:
         cur.execute("""
-            SELECT c.*
-            FROM users u
-            JOIN cards c ON c.id = u.showcase_card_id
-            WHERE u.user_id = %s
+            UPDATE users
+            SET msg_since_drop = 0
+            WHERE user_id = %s
         """, (user_id,))
-        return cur.fetchone()
+        conn.commit()
 
 
+def inc_message_counter(user_id):
+    with conn.cursor() as cur:
+        cur.execute("""
+            UPDATE users
+            SET msg_since_drop = msg_since_drop + 1
+            WHERE user_id = %s
+        """, (user_id,))
+        conn.commit()

@@ -115,6 +115,20 @@ def check_owner(cb: types.CallbackQuery, owner_id: int) -> bool:
         return False
     return True
 
+
+def top_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🕶 Очки", callback_data="top:points")],
+        [InlineKeyboardButton(text="🐽 Пяточки", callback_data="top:currency")],
+        [InlineKeyboardButton(text="💳 Карты", callback_data="top:cards")],
+    ])
+
+
+@dp.message()
+async def count_messages(msg: types.Message):
+    if msg.text and not msg.text.startswith("/"):
+        database.inc_message_counter(msg.from_user.id)
+
 # ---------- START ----------
 @dp.message(Command("start"))
 async def start(msg: types.Message):
@@ -193,14 +207,17 @@ async def card(msg: types.Message):
     user = database.get_user(user_id)
 
     remaining = DROP_COOLDOWN - (now - user["last_drop"])
-    if remaining > 0:
+
+    if remaining > 0 and user["msg_since_drop"] < 3:
+        need = 300 - user["msg_since_drop"]
         hours = remaining // 3600
         minutes = (remaining % 3600) // 60
         seconds = remaining % 60
 
         await msg.answer(
             "⏳ Ты уже получал карту.\n"
-            f"⏱ Осталось ждать: {hours:02d}:{minutes:02d}:{seconds:02d}"
+            f"⏱ Осталось ждать: {hours:02d}:{minutes:02d}:{seconds:02d}\n"
+            f"💬 Или напиши ещё {need} сообщений"
         )
         return
 
@@ -212,6 +229,7 @@ async def card(msg: types.Message):
     database.give_card(user_id, card_obj["id"])
     database.add_rewards(user_id, card_obj["points"], card_obj["currency"])
     database.update_drop_time(user_id)
+    database.reset_message_counter(user_id)
 
     await msg.answer_photo(
         photo=card_obj["image"],
@@ -392,29 +410,49 @@ async def profile(msg: types.Message):
 # ---------- TOP ----------
 @dp.message(Command("top"))
 async def top(msg: types.Message):
-    rows = database.top_points()
-    lines = []
+    await msg.answer(
+        "🏆 Выбери рейтинг:",
+        reply_markup=top_keyboard()
+    )
 
+@dp.callback_query(F.data.startswith("top:"))
+async def top_by_type(cb: types.CallbackQuery):
+    mode = cb.data.split(":")[1]
+
+    if mode == "points":
+        rows = database.top_points()
+        title = "🕶 Топ по очкам"
+        value_key = "points"
+
+    elif mode == "currency":
+        rows = database.top_currency()
+        title = "🐽 Топ по пяточкам"
+        value_key = "currency"
+
+    elif mode == "cards":
+        rows = database.top_cards()
+        title = "💳 Топ по картам"
+        value_key = "cards"
+
+    else:
+        return
+
+    lines = []
     for i, row in enumerate(rows, start=1):
         user_id = row["user_id"]
-        points = row["points"]
+        value = row[value_key]
 
         try:
             chat = await bot.get_chat(user_id)
-
-            if chat.first_name:
-                name = chat.first_name
-                if chat.last_name:
-                    name += f" {chat.last_name}"
-            else:
-                name = str(user_id)
-
+            name = chat.full_name
         except Exception:
             name = str(user_id)
 
-        lines.append(f"{i}. {name} — {points}")
+        lines.append(f"{i}. {name} — {value}")
 
-    await msg.answer("🏆 Топ:\n\n" + "\n".join(lines))
+    await cb.message.answer(
+        f"{title}\n\n" + "\n".join(lines)
+    )
 
 # ---------- RUN ----------
 async def main():

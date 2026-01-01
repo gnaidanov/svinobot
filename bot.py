@@ -237,21 +237,33 @@ async def cards(msg: types.Message):
 
 @dp.callback_query(F.data.startswith("cards:"))
 async def cards_by_rarity(cb: types.CallbackQuery):
-    rarity = cb.data.split(":")[1]
+    _, rarity, owner_id = cb.data.split(":")
+    owner_id = int(owner_id)
+
+    if cb.from_user.id != owner_id:
+        await cb.answer("❌ Это не твоя кнопка", show_alert=True)
+        return
+
     cards_list = database.get_cards_by_rarity(rarity)
     if not cards_list:
         await cb.message.answer("Нет карт этой редкости.")
         return
+
     await cb.message.answer(
         f"Карты ({RARITY_RU_MAP.get(rarity, rarity)}):",
-        reply_markup=cards_keyboard(cards_list, 0, "cards")
+        reply_markup=cards_keyboard(cards_list, 0, "cards", owner_id)
     )
 
-@dp.callback_query(F.data.endswith("_card"))
+@dp.callback_query(F.data.contains("_card:"))
 async def show_card(cb: types.CallbackQuery):
-    card_id = int(cb.data.split(":")[1])
-    card_obj = database.get_card_by_id(card_id)
+    _, rest = cb.data.split("_card:")
+    card_id, owner_id = map(int, rest.split(":"))
 
+    if cb.from_user.id != owner_id:
+        await cb.answer("❌ Это не твоя кнопка", show_alert=True)
+        return
+
+    card_obj = database.get_card_by_id(card_id)
     if not card_obj:
         await cb.message.answer("❌ Карта не найдена.")
         return
@@ -284,15 +296,26 @@ async def collection(msg: types.Message):
 
 @dp.callback_query(F.data.startswith("col:"))
 async def collection_by_rarity(cb: types.CallbackQuery):
-    rarity = cb.data.split(":")[1]
+    _, rarity, owner_id = cb.data.split(":")
+    owner_id = int(owner_id)
+
+    if cb.from_user.id != owner_id:
+        await cb.answer("❌ Это не твоя кнопка", show_alert=True)
+        return
+
     user_id = cb.from_user.id
-    cards_list = [c for c in database.get_collection(user_id) if c["rarity"] == rarity]
+    cards_list = [
+        c for c in database.get_collection(user_id)
+        if c["rarity"] == rarity
+    ]
+
     if not cards_list:
         await cb.message.answer("Нет карт этой редкости.")
         return
+
     await cb.message.answer(
         f"Твои карты ({RARITY_RU_MAP.get(rarity, rarity)}):",
-        reply_markup=cards_keyboard(cards_list, 0, "col")
+        reply_markup=cards_keyboard(cards_list, 0, "col", owner_id)
     )
 
 # ---------- SETCARD ----------

@@ -123,12 +123,6 @@ def top_keyboard():
         [InlineKeyboardButton(text="💳 Карты", callback_data="top:cards")],
     ])
 
-
-@dp.message(F.text)
-async def count_messages(msg: types.Message):
-    if msg.text and not msg.text.startswith("/"):
-        database.inc_message_counter(msg.from_user.id)
-
 # ---------- START ----------
 @dp.message(Command("start"))
 async def start(msg: types.Message):
@@ -208,8 +202,7 @@ async def card(msg: types.Message):
 
     remaining = DROP_COOLDOWN - (now - user["last_drop"])
 
-    if remaining > 0 and user["msg_since_drop"] < 300:
-        need = 300 - user["msg_since_drop"]
+    if remaining > 0:
         hours = remaining // 3600
         minutes = (remaining % 3600) // 60
         seconds = remaining % 60
@@ -229,7 +222,6 @@ async def card(msg: types.Message):
     database.give_card(user_id, card_obj["id"])
     database.add_rewards(user_id, card_obj["points"], card_obj["currency"])
     database.update_drop_time(user_id)
-    database.reset_message_counter(user_id)
 
     await msg.answer_photo(
         photo=card_obj["image"],

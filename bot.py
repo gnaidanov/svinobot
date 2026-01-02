@@ -162,7 +162,7 @@ async def addcard(msg: types.Message):
 
     args = msg.text.split(maxsplit=1)
     if len(args) < 2:
-        await msg.answer("❌ Укажи редкость: /addcard легендарная")
+        await msg.answer("❌ Укажи редкость: /addcard legendary")
         return
 
     rarity_raw = args[1].strip().lower()
@@ -185,25 +185,28 @@ async def addcard(msg: types.Message):
         await msg.answer(f"❌ Неизвестная редкость: {rarity_raw}")
         return
 
+    rarity_data = RARITIES.get(rarity)
+
+    if not isinstance(rarity_data, dict):
+        await msg.answer(
+            f"❌ Ошибка конфигурации редкости\n"
+            f"RARITIES['{rarity}'] = {rarity_data}"
+        )
+        return
+
     database.add_card(
         description=reply.caption.strip(),
         image=reply.photo[-1].file_id,
         rarity=rarity,
-        rarity_data = RARITIES.get(rarity)
-
-        if not isinstance(rarity_data, dict):
-            await msg.answer(
-                f"❌ Ошибка конфигурации редкости: {rarity}\n"
-                f"Текущее значение: {rarity_data}"
-            )
-            return
+        points=rarity_data["points"],
+        currency=rarity_data["currency"],
     )
 
     await msg.answer(
-        f"✅ Карта добавлена\n"
+        "✅ Карта добавлена\n"
         f"Редкость: {rarity}\n"
-        f"Очки: {RARITIES[rarity]['points']}\n"
-        f"Пяточки: {RARITIES[rarity]['currency']}"
+        f"Очки: {rarity_data['points']}\n"
+        f"Пяточки: {rarity_data['currency']}"
     )
 
 # ---------- CARD DROP ----------

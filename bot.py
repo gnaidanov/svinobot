@@ -155,13 +155,15 @@ async def addcard(msg: types.Message):
         await msg.answer("❌ У фото должна быть подпись.")
         return
 
-    parts = caption.strip().split("\n\n")
-    if len(parts) < 2:
-        await msg.answer("❌ Нужна пустая строка и редкость.")
+    # разбиваем на строки и убираем пустые
+    lines = [line.strip() for line in caption.splitlines() if line.strip()]
+
+    if len(lines) < 2:
+        await msg.answer("❌ В подписи должна быть редкость на отдельной строке.")
         return
 
-    description = parts[0].strip()
-    rarity_raw = parts[1].strip().lower()
+    rarity_raw = lines[-1].lower()
+    description = "\n".join(lines[:-1])
 
     rarity_map = {
         "обычная": "Common",
@@ -178,7 +180,7 @@ async def addcard(msg: types.Message):
 
     rarity = rarity_map.get(rarity_raw)
     if not rarity:
-        await msg.answer("❌ Неизвестная редкость.")
+        await msg.answer(f"❌ Неизвестная редкость: {rarity_raw}")
         return
 
     database.add_card(

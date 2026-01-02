@@ -235,40 +235,46 @@ def get_showcase_card(user_id: int):
 # ---------- TOP ----------
 def top_points(limit=10):
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT user_id, points
-            FROM users
+        cur.execute("""
+            SELECT
+              u.user_id,
+              COALESCE(SUM(uc.count * c.points), 0) AS points
+            FROM users u
+            LEFT JOIN user_cards uc ON uc.user_id = u.user_id
+            LEFT JOIN cards c ON c.id = uc.card_id
+            GROUP BY u.user_id
             ORDER BY points DESC
             LIMIT %s
-            """,
-            (limit,)
-        )
+        """, (limit,))
         return cur.fetchall()
+
 
 def top_currency(limit=10):
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT user_id, currency
-            FROM users
+        cur.execute("""
+            SELECT
+              u.user_id,
+              COALESCE(SUM(uc.count * c.currency), 0) AS currency
+            FROM users u
+            LEFT JOIN user_cards uc ON uc.user_id = u.user_id
+            LEFT JOIN cards c ON c.id = uc.card_id
+            GROUP BY u.user_id
             ORDER BY currency DESC
             LIMIT %s
-            """,
-            (limit,)
-        )
+        """, (limit,))
         return cur.fetchall()
+
 
 def top_cards(limit=10):
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT uc.user_id, SUM(uc.count) AS cards
-            FROM user_cards uc
-            GROUP BY uc.user_id
+        cur.execute("""
+            SELECT
+              u.user_id,
+              COALESCE(SUM(uc.count), 0) AS cards
+            FROM users u
+            LEFT JOIN user_cards uc ON uc.user_id = u.user_id
+            GROUP BY u.user_id
             ORDER BY cards DESC
             LIMIT %s
-            """,
-            (limit,)
-        )
+        """, (limit,))
         return cur.fetchall()

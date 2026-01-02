@@ -146,24 +146,26 @@ async def addcard(msg: types.Message):
         await msg.answer("❌ Нет доступа.")
         return
 
-    if not msg.reply_to_message or not msg.reply_to_message.photo:
-        await msg.answer("❌ Ответь на сообщение с фото карты.")
+    if not msg.reply_to_message:
+        await msg.answer("❌ Команда должна быть ответом на сообщение с фото карты.")
         return
 
-    caption = msg.reply_to_message.caption
-    if not caption:
-        await msg.answer("❌ У фото должна быть подпись.")
+    reply = msg.reply_to_message
+
+    if not reply.photo:
+        await msg.answer("❌ В сообщении должен быть фото.")
         return
 
-    # разбиваем на строки и убираем пустые
-    lines = [line.strip() for line in caption.splitlines() if line.strip()]
-
-    if len(lines) < 2:
-        await msg.answer("❌ В подписи должна быть редкость на отдельной строке.")
+    if not reply.caption:
+        await msg.answer("❌ У фото должна быть подпись (описание карты).")
         return
 
-    rarity_raw = lines[-1].lower()
-    description = "\n".join(lines[:-1])
+    args = msg.text.split(maxsplit=1)
+    if len(args) < 2:
+        await msg.answer("❌ Укажи редкость: /addcard легендарная")
+        return
+
+    rarity_raw = args[1].strip().lower()
 
     rarity_map = {
         "обычная": "Common",
@@ -184,14 +186,19 @@ async def addcard(msg: types.Message):
         return
 
     database.add_card(
-        description=description,
-        image=msg.reply_to_message.photo[-1].file_id,
+        description=reply.caption.strip(),
+        image=reply.photo[-1].file_id,
         rarity=rarity,
         points=RARITIES[rarity]["points"],
-        currency=RARITIES[rarity]["currency"]
+        currency=RARITIES[rarity]["currency"],
     )
 
-    await msg.answer("✅ Карта добавлена.")
+    await msg.answer(
+        f"✅ Карта добавлена\n"
+        f"Редкость: {rarity}\n"
+        f"Очки: {RARITIES[rarity]['points']}\n"
+        f"Пяточки: {RARITIES[rarity]['currency']}"
+    )
 
 # ---------- CARD DROP ----------
 @dp.message(Command("card"))

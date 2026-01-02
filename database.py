@@ -245,3 +245,30 @@ def top_points(limit=10):
             (limit,)
         )
         return cur.fetchall()
+
+def top_currency(limit=10):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT user_id, currency
+            FROM users
+            ORDER BY currency DESC
+            LIMIT %s
+            """,
+            (limit,)
+        )
+        return cur.fetchall()
+
+def top_cards(limit=10):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT uc.user_id, SUM(uc.count) AS cards
+            FROM user_cards uc
+            GROUP BY uc.user_id
+            ORDER BY cards DESC
+            LIMIT %s
+            """,
+            (limit,)
+        )
+        return cur.fetchall()

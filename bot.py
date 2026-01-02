@@ -444,6 +444,11 @@ async def top_by_type(cb: types.CallbackQuery):
         value_key = "cards"
 
     else:
+        await cb.answer("❌ Неизвестный рейтинг")
+        return
+
+    if not rows:
+        await cb.message.answer(f"{title}\n\nПока нет данных.")
         return
 
     lines = []
@@ -452,7 +457,7 @@ async def top_by_type(cb: types.CallbackQuery):
         value = row[value_key]
 
         try:
-            chat = await bot.get_chat(user_id)
+            chat = await cb.bot.get_chat(user_id)
             name = chat.full_name
         except Exception:
             name = str(user_id)

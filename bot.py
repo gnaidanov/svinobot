@@ -189,8 +189,14 @@ async def addcard(msg: types.Message):
         description=reply.caption.strip(),
         image=reply.photo[-1].file_id,
         rarity=rarity,
-        points=RARITIES[rarity]["points"],
-        currency=RARITIES[rarity]["currency"],
+        rarity_data = RARITIES.get(rarity)
+
+        if not isinstance(rarity_data, dict):
+            await msg.answer(
+                f"❌ Ошибка конфигурации редкости: {rarity}\n"
+                f"Текущее значение: {rarity_data}"
+            )
+            return
     )
 
     await msg.answer(

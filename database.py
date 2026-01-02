@@ -16,8 +16,6 @@ def init_db():
         cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id BIGINT PRIMARY KEY,
-            points INTEGER DEFAULT 0,
-            currency INTEGER DEFAULT 0,
             last_drop BIGINT DEFAULT 0,
             showcase_card_id INTEGER DEFAULT NULL
         );
@@ -66,19 +64,6 @@ def update_drop_time(user_id: int):
         cur.execute(
             "UPDATE users SET last_drop = EXTRACT(EPOCH FROM NOW()) WHERE user_id = %s",
             (user_id,)
-        )
-
-
-def add_rewards(user_id: int, points: int, currency: int):
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            UPDATE users
-            SET points = points + %s,
-                currency = currency + %s
-            WHERE user_id = %s
-            """,
-            (points, currency, user_id)
         )
 
 

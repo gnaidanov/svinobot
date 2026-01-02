@@ -21,11 +21,29 @@ dp = Dispatcher()
 
 CARDS_PER_PAGE = 25
 
+TOP_CACHE = {}
+TOP_CACHE_TTL = 30  # секунд
+
 # ---------- FSM ----------
 class AddCardState(StatesGroup):
     waiting_for_photo = State()
 
 # ---------- UTILS ----------
+def get_cached_top(key, builder):
+    now = time.time()
+    cached = TOP_CACHE.get(key)
+
+    if cached and now - cached["time"] < TOP_CACHE_TTL:
+        return cached["data"]
+
+    data = builder()
+    TOP_CACHE[key] = {
+        "time": now,
+        "data": data
+    }
+    return data
+
+
 def roll_rarity():
     pool = []
     for rarity, data in RARITIES.items():
@@ -201,6 +219,7 @@ async def addcard(msg: types.Message):
         points=rarity_data["points"],
         currency=rarity_data["currency"],
     )
+    TOP_CACHE.clear()
 
     await msg.answer(
         "✅ Карта добавлена\n"
@@ -237,6 +256,7 @@ async def card(msg: types.Message):
         return
 
     database.give_card(user_id, card_obj["id"])
+    TOP_CACHE.clear()
     database.add_rewards(user_id, card_obj["points"], card_obj["currency"])
     database.update_drop_time(user_id)
 
@@ -429,17 +449,26 @@ async def top_by_type(cb: types.CallbackQuery):
     mode = cb.data.split(":")[1]
 
     if mode == "points":
-        rows = database.top_points()
+        rows = get_cached_top(
+            "points",
+            lambda: database.top_points(10)
+        )
         title = "🕶 Топ по очкам"
         value_key = "points"
 
     elif mode == "currency":
-        rows = database.top_currency()
+        rows = get_cached_top(
+            "currency",
+            lambda: database.top_currency(10)
+        )
         title = "🐽 Топ по пяточкам"
         value_key = "currency"
 
     elif mode == "cards":
-        rows = database.top_cards()
+        rows = get_cached_top(
+            "cards",
+            lambda: database.top_cards(10)
+        )
         title = "💳 Топ по картам"
         value_key = "cards"
 

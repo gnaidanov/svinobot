@@ -230,9 +230,6 @@ async def addcard(msg: types.Message):
 
 # ---------- CARD DROP ----------
 @dp.message(Command("card"))
-
-can_take, reason = database.can_take_card(user_id)
-@dp.message(Command("card"))
 async def card(msg: types.Message):
     user_id = msg.from_user.id
 

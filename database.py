@@ -313,7 +313,8 @@ def can_take_card(user_id: int) -> tuple[bool, str]:
     if not row:
         return True, ""
 
-    last_card_at, msg_count = row
+    last_card_at = row["last_card_at"]
+    msg_count = row["messages_since_card"]
     now = datetime.utcnow()
 
     if last_card_at is None:
@@ -328,7 +329,8 @@ def can_take_card(user_id: int) -> tuple[bool, str]:
         return True, ""
 
     remaining_time = timedelta(hours=6) - (now - last_card_at)
-    hours, remainder = divmod(int(remaining_time.total_seconds()), 3600)
+    total_seconds = int(remaining_time.total_seconds())
+    hours, remainder = divmod(total_seconds, 3600)
     minutes = remainder // 60
 
     return False, f"⏳ Осталось {hours}ч {minutes}м или {300 - msg_count} сообщений"

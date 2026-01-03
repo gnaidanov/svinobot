@@ -4,7 +4,7 @@ import asyncio
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -230,6 +230,14 @@ async def addcard(msg: types.Message):
 
 # ---------- CARD DROP ----------
 @dp.message(Command("card"))
+
+can_take, reason = database.can_take_card(user_id)
+if not can_take:
+    await message.answer(
+        f"❌ Карту пока нельзя получить\n{reason}"
+    )
+    return
+
 async def card(msg: types.Message):
     user_id = msg.from_user.id
     now = int(time.time())
@@ -259,6 +267,7 @@ async def card(msg: types.Message):
     TOP_CACHE.clear()
     database.add_rewards(user_id, card_obj["points"], card_obj["currency"])
     database.update_drop_time(user_id)
+    database.reset_card_cooldown(user_id)
 
     await msg.answer_photo(
         photo=card_obj["image"],
@@ -269,6 +278,11 @@ async def card(msg: types.Message):
             f"🆔 ID: {card_obj['id']}"
         )
     )
+
+@dp.message(F.text, ~F.text.startswith("/"))
+async def count_messages(message: Message):
+    user_id = message.from_user.id
+    database.increment_message_counter(user_id)
 
 # ---------- CARDS ----------
 @dp.message(Command("cards"))

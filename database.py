@@ -1,6 +1,7 @@
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from datetime import datetime, timedelta
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
@@ -276,3 +277,63 @@ def top_cards(limit=10):
             LIMIT %s
         """, (limit,))
         return cur.fetchall()
+
+
+def increment_message_counter(user_id: int):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE users
+            SET messages_since_card = messages_since_card + 1
+            WHERE user_id = %s
+            """,
+            (user_id,)
+        )
+
+def can_take_card(user_id: int) -> tuple[bool, str]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT last_card_at, messages_since_card
+            FROM users
+            WHERE user_id = %s
+            """,
+            (user_id,)
+        )
+        row = cur.fetchone()
+
+    if not row:
+        return True, ""
+
+    last_card_at, msg_count = row
+    now = datetime.utcnow()
+
+    if last_card_at is None:
+        return True, ""
+
+    # 6 часов
+    if now - last_card_at >= timedelta(hours=6):
+        return True, ""
+
+    # 300 сообщений
+    if msg_count >= 300:
+        return True, ""
+
+    remaining_time = timedelta(hours=6) - (now - last_card_at)
+    hours, remainder = divmod(int(remaining_time.total_seconds()), 3600)
+    minutes = remainder // 60
+
+    return False, f"⏳ Осталось {hours}ч {minutes}м или {300 - msg_count} сообщений"
+
+def reset_card_cooldown(user_id: int):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE users
+            SET last_card_at = NOW(),
+                messages_since_card = 0
+            WHERE user_id = %s
+            """,
+            (user_id,)
+        )
+

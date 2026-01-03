@@ -240,24 +240,6 @@ async def card(msg: types.Message):
         )
         return
 
-    now = int(time.time())
-
-    database.add_user(user_id)
-    user = database.get_user(user_id)
-
-    remaining = DROP_COOLDOWN - (now - user["last_drop"])
-
-    if remaining > 0:
-        hours = remaining // 3600
-        minutes = (remaining % 3600) // 60
-        seconds = remaining % 60
-
-        await msg.answer(
-            "⏳ Ты уже получал карту.\n"
-            f"⏱ Осталось ждать: {hours:02d}:{minutes:02d}:{seconds:02d}\n"
-        )
-        return
-
     card_obj = get_safe_random_card()
     if not card_obj:
         await msg.answer("❌ Нет карт.")

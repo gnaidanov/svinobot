@@ -325,7 +325,7 @@ def can_take_card(user_id: int) -> tuple[bool, str]:
         return True, ""
 
     # 300 сообщений
-    if msg_count >= 3:
+    if msg_count >= 300:
         return True, ""
 
     remaining_time = timedelta(hours=6) - (now - last_card_at)
@@ -333,7 +333,7 @@ def can_take_card(user_id: int) -> tuple[bool, str]:
     hours, remainder = divmod(total_seconds, 3600)
     minutes = remainder // 60
 
-    return False, f"⏳ Осталось {hours}ч {minutes}м или {3 - msg_count} сообщений"
+    return False, f"⏳ Осталось {hours}ч {minutes}м или {300 - msg_count} сообщений"
 
 def reset_card_cooldown(user_id: int):
     with conn.cursor() as cur:

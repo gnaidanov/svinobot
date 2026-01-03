@@ -347,3 +347,15 @@ def reset_card_cooldown(user_id: int):
             (user_id,)
         )
 
+def get_card_count(user_id: int, card_id: int) -> int:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT count
+            FROM user_cards
+            WHERE user_id = %s AND card_id = %s
+            """,
+            (user_id, card_id)
+        )
+        row = cur.fetchone()
+        return row["count"] if row else 0

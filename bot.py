@@ -231,21 +231,11 @@ async def addcard(msg: types.Message):
 # ---------- CARD DROP ----------
 @dp.message(Command("card"))
 async def card(msg: types.Message):
-    card_count = 0
-    if database.user_has_card(user_id, card_obj["id"]):
-        # получаем количество
-        for c in database.get_collection(user_id):
-            if c["id"] == card_obj["id"]:
-                card_count = c["count"]
-                break
-
     user_id = msg.from_user.id
 
     can_take, reason = database.can_take_card(user_id)
     if not can_take:
-        await msg.answer(
-            f"❌ Карту пока нельзя получить\n{reason}"
-        )
+        await msg.answer(f"❌ Карту пока нельзя получить\n{reason}")
         return
 
     card_obj = get_safe_random_card()
@@ -254,10 +244,11 @@ async def card(msg: types.Message):
         return
 
     database.give_card(user_id, card_obj["id"])
-    TOP_CACHE.clear()
     database.add_rewards(user_id, card_obj["points"], card_obj["currency"])
-    database.update_drop_time(user_id)
     database.reset_card_cooldown(user_id)
+    TOP_CACHE.clear()
+
+    card_count = database.get_card_count(user_id, card_obj["id"])
 
     await msg.reply_photo(
         photo=card_obj["image"],
@@ -311,14 +302,6 @@ async def cards_by_rarity(cb: types.CallbackQuery):
 
 @dp.callback_query(F.data.contains("_card:"))
 async def show_card(cb: types.CallbackQuery):
-    card_count = 0
-    if database.user_has_card(user_id, card_obj["id"]):
-        # получаем количество
-        for c in database.get_collection(user_id):
-            if c["id"] == card_obj["id"]:
-                card_count = c["count"]
-                break
-
     _, rest = cb.data.split("_card:")
     card_id, owner_id = map(int, rest.split(":"))
 
@@ -330,6 +313,8 @@ async def show_card(cb: types.CallbackQuery):
     if not card_obj:
         await cb.message.answer("❌ Карта не найдена.")
         return
+
+    card_count = database.get_card_count(owner_id, card_id)
 
     await cb.message.answer_photo(
         photo=card_obj["image"],
@@ -441,7 +426,7 @@ async def profile(msg: types.Message):
     mention = f'<a href="tg://user?id={user_id}">{full_name}</a>'
 
     caption = (
-        "👤 Профиль {mention}\n"
+        f"👤 Профиль {mention}\n"
         f"🕶 Очки: {user['points']}\n"
         f"🐽 Пяточки: {user['currency']}\n"
         f"💳 Карточек: {total_cards}"
@@ -452,7 +437,7 @@ async def profile(msg: types.Message):
     if showcase_card:
         await msg.reply_photo(
             photo=showcase_card["image"],
-            caption=caption
+            caption=caption,
             parse_mode="HTML"
         )
     else:

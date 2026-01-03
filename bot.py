@@ -231,6 +231,14 @@ async def addcard(msg: types.Message):
 # ---------- CARD DROP ----------
 @dp.message(Command("card"))
 async def card(msg: types.Message):
+    card_count = 0
+    if database.user_has_card(user_id, card_obj["id"]):
+        # получаем количество
+        for c in database.get_collection(user_id):
+            if c["id"] == card_obj["id"]:
+                card_count = c["count"]
+                break
+
     user_id = msg.from_user.id
 
     can_take, reason = database.can_take_card(user_id)
@@ -251,21 +259,24 @@ async def card(msg: types.Message):
     database.update_drop_time(user_id)
     database.reset_card_cooldown(user_id)
 
-    await msg.answer_photo(
+    await msg.reply_photo(
         photo=card_obj["image"],
         caption=(
             f"💳 {card_obj['description']}\n\n"
             f"👑 {RARITY_RU_MAP.get(card_obj['rarity'])}\n"
             f"+{card_obj['points']} 🕶 | +{card_obj['currency']} 🐽\n\n"
+            f"🃏 Кол-во копий: {card_count}\n"
             f"🆔 ID: {card_obj['id']}"
         )
     )
 
 @dp.message(F.text, ~F.text.startswith("/"))
 async def count_messages(message: Message):
-    user_id = message.from_user.id
-    database.add_user(user_id)
-    database.increment_message_counter(user_id)
+    # Считаем только в группах и супергруппах
+    if message.chat.type in ["group", "supergroup"]:
+        user_id = message.from_user.id
+        database.add_user(user_id)
+        database.increment_message_counter(user_id)
 
 # ---------- CARDS ----------
 @dp.message(Command("cards"))
@@ -300,6 +311,14 @@ async def cards_by_rarity(cb: types.CallbackQuery):
 
 @dp.callback_query(F.data.contains("_card:"))
 async def show_card(cb: types.CallbackQuery):
+    card_count = 0
+    if database.user_has_card(user_id, card_obj["id"]):
+        # получаем количество
+        for c in database.get_collection(user_id):
+            if c["id"] == card_obj["id"]:
+                card_count = c["count"]
+                break
+
     _, rest = cb.data.split("_card:")
     card_id, owner_id = map(int, rest.split(":"))
 
@@ -318,6 +337,7 @@ async def show_card(cb: types.CallbackQuery):
             f"💳 {card_obj['description']}\n\n"
             f"👑 {RARITY_RU_MAP.get(card_obj['rarity'])}\n"
             f"+{card_obj['points']} 🕶 | +{card_obj['currency']} 🐽\n\n"
+            f"🃏 Кол-во копий: {card_count}\n"
             f"🆔 ID: {card_obj['id']}"
         )
     )
@@ -416,8 +436,12 @@ async def profile(msg: types.Message):
     cards = database.get_collection(user_id)
     total_cards = sum(c["count"] for c in cards)
 
+    chat = await bot.get_chat(user_id)
+    full_name = chat.full_name  # имя игрока
+    mention = f'<a href="tg://user?id={user_id}">{full_name}</a>'
+
     caption = (
-        "👤 Профиль\n"
+        "👤 Профиль {mention}\n"
         f"🕶 Очки: {user['points']}\n"
         f"🐽 Пяточки: {user['currency']}\n"
         f"💳 Карточек: {total_cards}"
@@ -426,12 +450,13 @@ async def profile(msg: types.Message):
     showcase_card = database.get_showcase_card(user_id)
 
     if showcase_card:
-        await msg.answer_photo(
+        await msg.reply_photo(
             photo=showcase_card["image"],
             caption=caption
+            parse_mode="HTML"
         )
     else:
-        await msg.answer(caption)
+        await msg.reply(caption)
 
 # ---------- TOP ----------
 @dp.message(Command("top"))

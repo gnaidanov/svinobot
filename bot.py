@@ -232,14 +232,17 @@ async def addcard(msg: types.Message):
 @dp.message(Command("card"))
 
 can_take, reason = database.can_take_card(user_id)
-if not can_take:
-    await message.answer(
-        f"❌ Карту пока нельзя получить\n{reason}"
-    )
-    return
-
+@dp.message(Command("card"))
 async def card(msg: types.Message):
     user_id = msg.from_user.id
+
+    can_take, reason = database.can_take_card(user_id)
+    if not can_take:
+        await msg.answer(
+            f"❌ Карту пока нельзя получить\n{reason}"
+        )
+        return
+
     now = int(time.time())
 
     database.add_user(user_id)
@@ -282,6 +285,7 @@ async def card(msg: types.Message):
 @dp.message(F.text, ~F.text.startswith("/"))
 async def count_messages(message: Message):
     user_id = message.from_user.id
+    database.add_user(user_id)
     database.increment_message_counter(user_id)
 
 # ---------- CARDS ----------

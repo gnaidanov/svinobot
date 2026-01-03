@@ -17,7 +17,15 @@ def init_db():
         cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             user_id BIGINT PRIMARY KEY,
+
+            points INTEGER NOT NULL DEFAULT 0,
+            currency INTEGER NOT NULL DEFAULT 0,
+
             last_drop BIGINT DEFAULT 0,
+
+            last_card_at TIMESTAMP NULL,
+            messages_since_card INTEGER NOT NULL DEFAULT 0,
+
             showcase_card_id INTEGER DEFAULT NULL
         );
         """)

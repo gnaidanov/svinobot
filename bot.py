@@ -445,7 +445,7 @@ async def profile(msg: types.Message):
         )
     else:
         await msg.reply(
-            caption=caption,
+            text=caption,
             parse_mode="HTML",
             disable_web_page_preview=True
         )

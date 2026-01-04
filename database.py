@@ -76,19 +76,6 @@ def update_drop_time(user_id: int):
         )
 
 
-def add_rewards(user_id: int, points: int, currency: int):
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            UPDATE users
-            SET points = points + %s,
-                currency = currency + %s
-            WHERE user_id = %s
-            """,
-            (points, currency, user_id)
-        )
-
-
 def set_showcase_card(user_id, card_id):
     with conn.cursor() as cur:
         try:

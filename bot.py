@@ -244,7 +244,6 @@ async def card(msg: types.Message):
         return
 
     database.give_card(user_id, card_obj["id"])
-    database.add_rewards(user_id, card_obj["points"], card_obj["currency"])
     database.reset_card_cooldown(user_id)
     TOP_CACHE.clear()
 
@@ -430,8 +429,8 @@ async def profile(msg: types.Message):
 
     caption = (
         f"👤 Профиль {mention}\n"
-        f"🕶 Очки: {user['points']}\n"
-        f"🐽 Пяточки: {user['currency']}\n"
+        f"🕶 Очки: {points}\n"
+        f"🐽 Пяточки: {currency}\n"
         f"💳 Карточек: {total_cards}"
     )
 
@@ -442,9 +441,14 @@ async def profile(msg: types.Message):
             photo=showcase_card["image"],
             caption=caption,
             parse_mode="HTML"
+            disable_web_page_preview=True
         )
     else:
-        await msg.reply(caption)
+        await msg.reply(
+            caption=caption
+            parse_mode="HTML"
+            disable_web_page_preview=True
+        )
 
 # ---------- TOP ----------
 @dp.message(Command("top"))

@@ -440,13 +440,13 @@ async def profile(msg: types.Message):
         await msg.reply_photo(
             photo=showcase_card["image"],
             caption=caption,
-            parse_mode="HTML"
+            parse_mode="HTML",
             disable_web_page_preview=True
         )
     else:
         await msg.reply(
-            caption=caption
-            parse_mode="HTML"
+            caption=caption,
+            parse_mode="HTML",
             disable_web_page_preview=True
         )
 

@@ -528,10 +528,10 @@ async def trade_cmd(msg: Message):
         return
 
     try:
-        from_card_id = int(args[1])
-        to_card_id = int(args[3])
+        from_card_id = int(parts[1])
+        to_card_id = int(parts[3])
     except ValueError:
-        return await message.reply("❌ ID карт должны быть числами")
+        return await msg.reply("❌ ID карт должны быть числами")
 
     from_user = msg.from_user.id
     to_user = msg.reply_to_message.from_user.id
@@ -580,7 +580,7 @@ async def trade_cmd(msg: Message):
         parse_mode="Markdown"
     )
 
-@dp.callback_query(lambda c: c.data.startswith("trade_"))
+@dp.callback_query(lambda c: c.data.startswith("trade_accept:") or c.data.startswith("trade_decline:"))
 async def trade_callback(cb: CallbackQuery):
     action, trade_id = cb.data.split(":")
     trade_id = int(trade_id)

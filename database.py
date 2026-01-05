@@ -68,6 +68,33 @@ def get_user(user_id: int):
         return cur.fetchone()
 
 
+def get_user_card(user_id: int, card_id: int):
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=DictCursor)
+
+    cur.execute(
+        """
+        SELECT uc.card_id,
+               c.id,
+               c.name,
+               c.rarity,
+               c.points,
+               c.currency
+        FROM user_cards uc
+        JOIN cards c ON c.id = uc.card_id
+        WHERE uc.user_id = %s AND uc.card_id = %s
+        LIMIT 1
+        """,
+        (user_id, card_id)
+    )
+
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    return dict(row) if row else None
+
+
 def update_drop_time(user_id: int):
     with conn.cursor() as cur:
         cur.execute(

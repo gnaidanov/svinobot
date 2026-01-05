@@ -52,6 +52,18 @@ def init_db():
         );
         """)
 
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS trades (
+            id SERIAL PRIMARY KEY,
+            from_user BIGINT NOT NULL,
+            to_user BIGINT NOT NULL,
+            from_card INTEGER NOT NULL,
+            to_card INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+        """)
+
 
 # ---------- USERS ----------
 def add_user(user_id: int):
@@ -367,39 +379,70 @@ def get_card_count(user_id: int, card_id: int) -> int:
         row = cur.fetchone()
         return row["count"] if row else 0
 
-def create_trade(self, from_user, to_user, from_card, to_card):
-    cur = self.conn.cursor()
-    cur.execute("""
-        INSERT INTO trades (from_user, to_user, from_card, to_card)
-        VALUES (?, ?, ?, ?)
-    """, (from_user, to_user, from_card, to_card))
-    self.conn.commit()
-    return cur.lastrowid
 
-def get_trade(self, trade_id):
-    cur = self.conn.cursor()
-    cur.execute("SELECT * FROM trades WHERE id = ?", (trade_id,))
-    row = cur.fetchone()
-    return dict(row) if row else None
+def create_trade(from_user, to_user, from_card, to_card):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO trades (from_user, to_user, from_card, to_card)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id
+            """,
+            (from_user, to_user, from_card, to_card)
+        )
+        return cur.fetchone()["id"]
 
-def update_trade_status(self, trade_id, status):
-    self.conn.execute(
-        "UPDATE trades SET status = ? WHERE id = ?",
-        (status, trade_id)
-    )
-    self.conn.commit()
 
-def swap_cards(self, user1, user2, card1, card2):
-    cur = self.conn.cursor()
-    cur.execute("BEGIN")
+def get_trade(trade_id):
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT * FROM trades WHERE id = %s",
+            (trade_id,)
+        )
+        return cur.fetchone()
 
-    cur.execute(
-        "UPDATE user_cards SET user_id = ? WHERE user_id = ? AND card_id = ?",
-        (user2, user1, card1)
-    )
-    cur.execute(
-        "UPDATE user_cards SET user_id = ? WHERE user_id = ? AND card_id = ?",
-        (user1, user2, card2)
-    )
 
-    self.conn.commit()
+def update_trade_status(trade_id, status):
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE trades SET status = %s WHERE id = %s",
+            (status, trade_id)
+        )
+
+
+def swap_cards(user1, user2, card1, card2):
+    with conn.cursor() as cur:
+        # уменьшаем количество
+        cur.execute(
+            "UPDATE user_cards SET count = count - 1 WHERE user_id = %s AND card_id = %s",
+            (user1, card1)
+        )
+        cur.execute(
+            "UPDATE user_cards SET count = count - 1 WHERE user_id = %s AND card_id = %s",
+            (user2, card2)
+        )
+
+        # чистим нули
+        cur.execute(
+            "DELETE FROM user_cards WHERE count <= 0"
+        )
+
+        # добавляем полученные
+        cur.execute(
+            """
+            INSERT INTO user_cards (user_id, card_id, count)
+            VALUES (%s, %s, 1)
+            ON CONFLICT (user_id, card_id)
+            DO UPDATE SET count = user_cards.count + 1
+            """,
+            (user1, card2)
+        )
+        cur.execute(
+            """
+            INSERT INTO user_cards (user_id, card_id, count)
+            VALUES (%s, %s, 1)
+            ON CONFLICT (user_id, card_id)
+            DO UPDATE SET count = user_cards.count + 1
+            """,
+            (user2, card1)
+        )

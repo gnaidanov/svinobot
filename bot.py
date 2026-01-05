@@ -4,7 +4,7 @@ import asyncio
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, CallbackQuery
 
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup

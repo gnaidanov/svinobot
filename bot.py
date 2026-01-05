@@ -511,6 +511,96 @@ async def top_by_type(cb: types.CallbackQuery):
         f"{title}\n\n" + "\n".join(lines)
     )
 
+# ---------- TRADE ----------
+@dp.message(Command("trade"))
+async def trade_cmd(msg: Message):
+    if not msg.reply_to_message:
+        await msg.reply("❌ Команда должна быть ответом на сообщение игрока")
+        return
+
+    parts = msg.text.split()
+    if len(parts) != 4 or parts[2].lower() != "for":
+        await msg.reply("❌ Формат: /trade <твоя_карта_id> for <карта_игрока_id>")
+        return
+
+    from_card_id = int(parts[1])
+    to_card_id = int(parts[3])
+
+    from_user = msg.from_user.id
+    to_user = msg.reply_to_message.from_user.id
+
+    if from_user == to_user:
+        await msg.reply("❌ Нельзя обмениваться с самим собой")
+        return
+
+    # получаем карты
+    from_card = db.get_user_card(from_user, from_card_id)
+    to_card = db.get_user_card(to_user, to_card_id)
+
+    if not from_card:
+        await msg.reply("❌ У тебя нет такой карты")
+        return
+
+    if not to_card:
+        await msg.reply("❌ У игрока нет такой карты")
+        return
+
+    if from_card["rarity"] != to_card["rarity"]:
+        await msg.reply("❌ Можно обмениваться только картами одной редкости")
+        return
+
+    trade_id = db.create_trade(
+        from_user, to_user, from_card_id, to_card_id
+    )
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Принять", callback_data=f"trade_accept:{trade_id}"),
+            InlineKeyboardButton(text="❌ Отказаться", callback_data=f"trade_decline:{trade_id}")
+        ]
+    ])
+
+    await msg.reply_to_message.reply(
+        f"🔄 **Запрос обмена карт**\n\n"
+        f"Игрок предлагает обмен:\n"
+        f"💳 {from_card_id} ↔ {to_card_id}\n"
+        f"🎖 Редкость: {from_card['rarity']}",
+        reply_markup=kb
+    )
+
+@dp.callback_query(lambda c: c.data.startswith("trade_"))
+async def trade_callback(cb: CallbackQuery):
+    action, trade_id = cb.data.split(":")
+    trade_id = int(trade_id)
+
+    trade = db.get_trade(trade_id)
+    if not trade or trade["status"] != "pending":
+        await cb.answer("❌ Этот обмен недействителен", show_alert=True)
+        return
+
+    if cb.from_user.id != trade["to_user"]:
+        await cb.answer("❌ Это не тебе адресовано", show_alert=True)
+        return
+
+    if action == "trade_decline":
+        db.update_trade_status(trade_id, "declined")
+        await cb.message.edit_text("❌ Обмен отклонён")
+        await cb.answer()
+        return
+
+    # ACCEPT
+    db.swap_cards(
+        trade["from_user"],
+        trade["to_user"],
+        trade["from_card"],
+        trade["to_card"]
+    )
+
+    db.update_trade_status(trade_id, "accepted")
+
+    await cb.message.edit_text("✅ Обмен успешно завершён")
+    await cb.answer("Обмен выполнен")
+
 # ---------- RUN ----------
 async def main():
     database.init_db()

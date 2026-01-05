@@ -346,3 +346,40 @@ def get_card_count(user_id: int, card_id: int) -> int:
         )
         row = cur.fetchone()
         return row["count"] if row else 0
+
+def create_trade(self, from_user, to_user, from_card, to_card):
+    cur = self.conn.cursor()
+    cur.execute("""
+        INSERT INTO trades (from_user, to_user, from_card, to_card)
+        VALUES (?, ?, ?, ?)
+    """, (from_user, to_user, from_card, to_card))
+    self.conn.commit()
+    return cur.lastrowid
+
+def get_trade(self, trade_id):
+    cur = self.conn.cursor()
+    cur.execute("SELECT * FROM trades WHERE id = ?", (trade_id,))
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+def update_trade_status(self, trade_id, status):
+    self.conn.execute(
+        "UPDATE trades SET status = ? WHERE id = ?",
+        (status, trade_id)
+    )
+    self.conn.commit()
+
+def swap_cards(self, user1, user2, card1, card2):
+    cur = self.conn.cursor()
+    cur.execute("BEGIN")
+
+    cur.execute(
+        "UPDATE user_cards SET user_id = ? WHERE user_id = ? AND card_id = ?",
+        (user2, user1, card1)
+    )
+    cur.execute(
+        "UPDATE user_cards SET user_id = ? WHERE user_id = ? AND card_id = ?",
+        (user1, user2, card2)
+    )
+
+    self.conn.commit()

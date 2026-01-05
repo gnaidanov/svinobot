@@ -459,10 +459,3 @@ def get_card(card_id):
             (card_id,)
         )
         return cur.fetchone()
-
-def update_trade_status(trade_id, status):
-    with conn.cursor() as cur:
-        cur.execute(
-            "UPDATE trades SET status = %s WHERE id = %s",
-            (status, trade_id)
-        )

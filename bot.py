@@ -24,6 +24,8 @@ CARDS_PER_PAGE = 25
 TOP_CACHE = {}
 TOP_CACHE_TTL = 30  # секунд
 
+COOLDOWN_CHAT_ID = -1002336027168
+
 # ---------- FSM ----------
 class AddCardState(StatesGroup):
     waiting_for_photo = State()
@@ -516,11 +518,9 @@ async def top_by_type(cb: types.CallbackQuery):
 # ---------- TRADE ----------
 @dp.message(Command("trade"))
 async def trade_cmd(msg: Message):
-    from_card = database.get_card(from_card_id)
-    to_card = database.get_card(to_card_id)
 
-    if from_card["is_limited"] or to_card["is_limited"]:
-        return await message.reply("🚫 Лимитированные карты нельзя обменивать")
+    if from_card["rarity"] == "Limited" or to_card["rarity"] == "Limited":
+        return await msg.reply("🚫 Лимитированные карты нельзя обменивать")
 
     if not msg.reply_to_message:
         await msg.reply("❌ Команда должна быть ответом на сообщение игрока")
@@ -564,8 +564,8 @@ async def trade_cmd(msg: Message):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="✅ Принять", callback_data=f"trade_accept:{trade_id}"),
-            InlineKeyboardButton(text="❌ Отказаться", callback_data=f"trade_decline:{trade_id}")
-            InlineKeyboardButton(text="❌ Отменить", callback_data=f"trade_cancel:{trade_id}")
+            InlineKeyboardButton(text="❌ Отказаться", callback_data=f"trade_decline:{trade_id}"),
+            InlineKeyboardButton(text="↩️ Отменить", callback_data=f"trade_cancel:{trade_id}")
         ]
     ])
 
@@ -574,7 +574,8 @@ async def trade_cmd(msg: Message):
         f"Игрок предлагает обмен:\n"
         f"💳 {from_card_id} ↔ {to_card_id}\n"
         f"🎖 Редкость: {from_card['rarity']}",
-        reply_markup=kb
+        reply_markup=kb,
+        parse_mode="Markdown"
     )
 
 @dp.callback_query(lambda c: c.data.startswith("trade_"))

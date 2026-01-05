@@ -534,8 +534,8 @@ async def trade_cmd(msg: Message):
         return
 
     # получаем карты
-    from_card = db.get_user_card(from_user, from_card_id)
-    to_card = db.get_user_card(to_user, to_card_id)
+    from_card = database.get_user_card(from_user, from_card_id)
+    to_card = database.get_user_card(to_user, to_card_id)
 
     if not from_card:
         await msg.reply("❌ У тебя нет такой карты")
@@ -549,7 +549,7 @@ async def trade_cmd(msg: Message):
         await msg.reply("❌ Можно обмениваться только картами одной редкости")
         return
 
-    trade_id = db.create_trade(
+    trade_id = database.create_trade(
         from_user, to_user, from_card_id, to_card_id
     )
 
@@ -573,7 +573,7 @@ async def trade_callback(cb: CallbackQuery):
     action, trade_id = cb.data.split(":")
     trade_id = int(trade_id)
 
-    trade = db.get_trade(trade_id)
+    trade = database.get_trade(trade_id)
     if not trade or trade["status"] != "pending":
         await cb.answer("❌ Этот обмен недействителен", show_alert=True)
         return
@@ -583,20 +583,20 @@ async def trade_callback(cb: CallbackQuery):
         return
 
     if action == "trade_decline":
-        db.update_trade_status(trade_id, "declined")
+        database.update_trade_status(trade_id, "declined")
         await cb.message.edit_text("❌ Обмен отклонён")
         await cb.answer()
         return
 
     # ACCEPT
-    db.swap_cards(
+    database.swap_cards(
         trade["from_user"],
         trade["to_user"],
         trade["from_card"],
         trade["to_card"]
     )
 
-    db.update_trade_status(trade_id, "accepted")
+    database.update_trade_status(trade_id, "accepted")
 
     await cb.message.edit_text("✅ Обмен успешно завершён")
     await cb.answer("Обмен выполнен")

@@ -446,3 +446,23 @@ def swap_cards(user1, user2, card1, card2):
             """,
             (user2, card1)
         )
+
+def is_trade_expired(trade):
+    return trade["status"] == "pending" and (
+        trade["created_at"] < datetime.utcnow() - timedelta(minutes=3)
+    )
+
+def get_card(card_id):
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT * FROM cards WHERE id = %s",
+            (card_id,)
+        )
+        return cur.fetchone()
+
+def update_trade_status(trade_id, status):
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE trades SET status = %s WHERE id = %s",
+            (status, trade_id)
+        )

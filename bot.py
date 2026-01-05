@@ -262,11 +262,13 @@ async def card(msg: types.Message):
 
 @dp.message(F.text, ~F.text.startswith("/"))
 async def count_messages(message: Message):
-    # Считаем только в группах и супергруппах
-    if message.chat.type in ["group", "supergroup"]:
-        user_id = message.from_user.id
-        database.add_user(user_id)
-        database.increment_message_counter(user_id)
+    if message.chat.type == "private":
+        return
+    if message.chat.id != COOLDOWN_CHAT_ID:
+        return
+    user_id = message.from_user.id
+    database.add_user(user_id)
+    database.increment_message_counter(user_id)
 
 # ---------- CARDS ----------
 @dp.message(Command("cards"))
@@ -514,6 +516,12 @@ async def top_by_type(cb: types.CallbackQuery):
 # ---------- TRADE ----------
 @dp.message(Command("trade"))
 async def trade_cmd(msg: Message):
+    from_card = database.get_card(from_card_id)
+    to_card = database.get_card(to_card_id)
+
+    if from_card["is_limited"] or to_card["is_limited"]:
+        return await message.reply("🚫 Лимитированные карты нельзя обменивать")
+
     if not msg.reply_to_message:
         await msg.reply("❌ Команда должна быть ответом на сообщение игрока")
         return
@@ -557,6 +565,7 @@ async def trade_cmd(msg: Message):
         [
             InlineKeyboardButton(text="✅ Принять", callback_data=f"trade_accept:{trade_id}"),
             InlineKeyboardButton(text="❌ Отказаться", callback_data=f"trade_decline:{trade_id}")
+            InlineKeyboardButton(text="❌ Отменить", callback_data=f"trade_cancel:{trade_id}")
         ]
     ])
 
@@ -589,6 +598,12 @@ async def trade_callback(cb: CallbackQuery):
         return
 
     # ACCEPT
+    trade = database.get_trade(trade_id)
+
+    if is_trade_expired(trade):
+        database.update_trade_status(trade_id, "expired")
+        return await cb.answer("⏳ Обмен просрочен", show_alert=True)
+
     database.swap_cards(
         trade["from_user"],
         trade["to_user"],
@@ -600,6 +615,27 @@ async def trade_callback(cb: CallbackQuery):
 
     await cb.message.edit_text("✅ Обмен успешно завершён")
     await cb.answer("Обмен выполнен")
+
+@dp.callback_query(lambda c: c.data.startswith("trade_cancel:"))
+async def trade_cancel_cb(cb: CallbackQuery):
+    trade_id = int(cb.data.split(":")[1])
+    user_id = cb.from_user.id
+
+    trade = database.get_trade(trade_id)
+
+    if not trade:
+        return await cb.answer("Обмен не найден", show_alert=True)
+
+    if trade["status"] != "pending":
+        return await cb.answer("Обмен уже завершён", show_alert=True)
+
+    if trade["from_user"] != user_id:
+        return await cb.answer("Отменить может только инициатор", show_alert=True)
+
+    database.update_trade_status(trade_id, "cancelled")
+
+    await cb.message.edit_text("❌ Обмен отменён инициатором")
+    await cb.answer("Обмен отменён")
 
 # ---------- RUN ----------
 async def main():

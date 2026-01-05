@@ -518,10 +518,6 @@ async def top_by_type(cb: types.CallbackQuery):
 # ---------- TRADE ----------
 @dp.message(Command("trade"))
 async def trade_cmd(msg: Message):
-
-    if from_card["rarity"] == "Limited" or to_card["rarity"] == "Limited":
-        return await msg.reply("🚫 Лимитированные карты нельзя обменивать")
-
     if not msg.reply_to_message:
         await msg.reply("❌ Команда должна быть ответом на сообщение игрока")
         return
@@ -531,8 +527,11 @@ async def trade_cmd(msg: Message):
         await msg.reply("❌ Формат: /trade <твоя_карта_id> for <карта_игрока_id>")
         return
 
-    from_card_id = int(parts[1])
-    to_card_id = int(parts[3])
+    try:
+        from_card_id = int(args[1])
+        to_card_id = int(args[3])
+    except ValueError:
+        return await message.reply("❌ ID карт должны быть числами")
 
     from_user = msg.from_user.id
     to_user = msg.reply_to_message.from_user.id
@@ -556,6 +555,9 @@ async def trade_cmd(msg: Message):
     if from_card["rarity"] != to_card["rarity"]:
         await msg.reply("❌ Можно обмениваться только картами одной редкости")
         return
+
+    if from_card["rarity"] == "Limited" or to_card["rarity"] == "Limited":
+        return await msg.reply("🚫 Лимитированные карты нельзя обменивать")
 
     trade_id = database.create_trade(
         from_user, to_user, from_card_id, to_card_id

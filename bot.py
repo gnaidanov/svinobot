@@ -575,7 +575,7 @@ async def trade_cmd(msg: Message):
         f"🔄 **Запрос обмена карт**\n\n"
         f"Игрок предлагает обмен:\n"
         f"💳 {from_card_id} ↔ {to_card_id}\n"
-        f"🎖 Редкость: {from_card['rarity']}",
+        f"👑 Редкость: {from_card['rarity']}",
         reply_markup=kb,
         parse_mode="Markdown"
     )

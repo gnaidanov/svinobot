@@ -454,3 +454,7 @@ def get_card(card_id):
             (card_id,)
         )
         return cur.fetchone()
+
+def get_total_cards(user_id: int) -> int:
+    cards = get_collection(user_id)
+    return sum(c["count"] for c in cards)

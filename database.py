@@ -2,6 +2,7 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime, timedelta
+from config import DROP_COOLDOWN
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:

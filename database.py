@@ -66,6 +66,17 @@ def init_db():
         );
         """)
 
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS market (
+            id SERIAL PRIMARY KEY,
+            seller_id BIGINT,
+            card_id INTEGER,
+            price INTEGER,
+            created_at TIMESTAMP,
+            status TEXT
+        );
+        """)
+
 
 # ---------- USERS ----------
 def add_user(user_id: int):
@@ -469,20 +480,3 @@ def add_currency(user_id: int, amount: int):
             "UPDATE users SET currency_balance = currency_balance + %s WHERE user_id = %s",
             (amount, user_id)
         )
-
-def migrate_currency_from_cards():
-    with conn.cursor() as cur:
-        cur.execute("SELECT user_id FROM users")
-        users = cur.fetchall()
-
-    for row in users:
-        user_id = row["user_id"]
-        cards = get_collection(user_id)
-
-        total = sum(c["count"] * c["currency"] for c in cards)
-
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE users SET currency_balance = %s WHERE user_id = %s",
-                (total, user_id)
-            )

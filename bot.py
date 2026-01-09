@@ -688,7 +688,6 @@ async def trade_callback(cb: CallbackQuery):
 # ---------- RUN ----------
 async def main():
     database.init_db()
-    database.migrate_currency_from_cards()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":

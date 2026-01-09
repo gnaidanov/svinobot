@@ -4,7 +4,7 @@ import os
 API_TOKEN = os.getenv("API_TOKEN")
 
 # ---------- GAME ----------
-DROP_COOLDOWN = 6 * 60 * 60
+DROP_COOLDOWN = 3
 
 RARITIES = {
     "Common":      {"chance": 60, "points": 5,   "currency": 2},

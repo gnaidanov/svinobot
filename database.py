@@ -339,15 +339,17 @@ def can_take_card(user_id: int) -> tuple[bool, str]:
     if last_card_at is None:
         return True, ""
 
-    # 6 часов
-    if now - last_card_at >= timedelta(hours=3):
+    cooldown = timedelta(seconds=DROP_COOLDOWN)
+
+    # проверка по времени
+    if now - last_card_at >= cooldown:
         return True, ""
 
-    # 300 сообщений
+    # проверка по сообщениям
     if msg_count >= 300:
         return True, ""
 
-    remaining_time = timedelta(hours=6) - (now - last_card_at)
+    remaining_time = cooldown - (now - last_card_at)
     total_seconds = int(remaining_time.total_seconds())
     hours, remainder = divmod(total_seconds, 3600)
     minutes = remainder // 60

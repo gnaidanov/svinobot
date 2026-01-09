@@ -21,6 +21,7 @@ def init_db():
 
             points INTEGER NOT NULL DEFAULT 0,
             currency INTEGER NOT NULL DEFAULT 0,
+            currency_balance INTEGER NOT NULL DEFAULT 0,
 
             last_drop BIGINT DEFAULT 0,
 
@@ -461,3 +462,27 @@ def get_card(card_id):
 def get_total_cards(user_id: int) -> int:
     cards = get_collection(user_id)
     return sum(c["count"] for c in cards)
+
+def add_currency(user_id: int, amount: int):
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE users SET currency_balance = currency_balance + %s WHERE user_id = %s",
+            (amount, user_id)
+        )
+
+def migrate_currency_from_cards():
+    with conn.cursor() as cur:
+        cur.execute("SELECT user_id FROM users")
+        users = cur.fetchall()
+
+    for row in users:
+        user_id = row["user_id"]
+        cards = get_collection(user_id)
+
+        total = sum(c["count"] * c["currency"] for c in cards)
+
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE users SET currency_balance = %s WHERE user_id = %s",
+                (total, user_id)
+            )

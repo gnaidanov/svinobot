@@ -424,7 +424,7 @@ async def profile(msg: types.Message):
     cards = database.get_collection(user_id)
 
     points = sum(c["count"] * c["points"] for c in cards)
-    currency = sum(c["count"] * c["currency"] for c in cards)
+    currency = user["currency_balance"]
     total_cards = sum(c["count"] for c in cards)
 
     chat = await bot.get_chat(user_id)

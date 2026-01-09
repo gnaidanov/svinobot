@@ -340,7 +340,7 @@ def can_take_card(user_id: int) -> tuple[bool, str]:
         return True, ""
 
     # 6 часов
-    if now - last_card_at >= timedelta(hours=6):
+    if now - last_card_at >= timedelta(hours=3):
         return True, ""
 
     # 300 сообщений

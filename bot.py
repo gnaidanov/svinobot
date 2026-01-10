@@ -763,7 +763,7 @@ async def buy_cmd(msg: Message):
     await msg.reply(
         text,
         reply_markup=buy_list_kb(listings, msg.from_user.id),
-        parse_mode="Markdown"
+        parse_mode="Markdown",
         disable_web_page_preview=True
     )
 

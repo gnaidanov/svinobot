@@ -78,26 +78,27 @@ def init_db():
         """)
 
         cur.execute("""
-	CREATE TABLE IF NOT EXISTS market_listings (
-	    id SERIAL PRIMARY KEY,
-	    seller_id BIGINT NOT NULL,
-	    card_id INTEGER NOT NULL,
-	    price INTEGER NOT NULL,
-	    status TEXT NOT NULL DEFAULT 'active',
-	    created_at TIMESTAMP NOT NULL DEFAULT NOW()
-	)
-	""")
+    CREATE TABLE IF NOT EXISTS market_listings (
+        id SERIAL PRIMARY KEY,
+        seller_id BIGINT NOT NULL,
+        card_id INTEGER NOT NULL,
+        price INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+    """)
 
-	cur.execute("""
-	CREATE TABLE IF NOT EXISTS trade_offers (
-	    id SERIAL PRIMARY KEY,
-	    from_user_id BIGINT NOT NULL,
-	    to_user_id BIGINT NOT NULL,
-	    type TEXT CHECK (type IN ('buy','sell')) NOT NULL,
-	    card_id INT NOT NULL,
-	    price INT NOT NULL,
-	    created_at TIMESTAMP DEFAULT NOW()
-	);
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS trade_offers (
+        id SERIAL PRIMARY KEY,
+        from_user_id BIGINT NOT NULL,
+        to_user_id BIGINT NOT NULL,
+        type TEXT CHECK (type IN ('buy','sell')) NOT NULL,
+        card_id INT NOT NULL,
+        price INT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+    );
+    """)
 
 
 # ---------- USERS ----------
@@ -682,14 +683,6 @@ def cancel_listing(listing_id: int, seller_id: int) -> bool:
             return False
         conn.commit()
         return True
-
-def get_total_cards(user_id: int) -> int:
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT COALESCE(SUM(count), 0) AS total FROM user_cards WHERE user_id = %s",
-            (user_id,)
-        )
-        return cur.fetchone()["total"]
 
 def create_trade_offer(from_id, to_id, offer_type, card_id, price):
     with conn.cursor() as cur:

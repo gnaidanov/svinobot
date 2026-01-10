@@ -751,6 +751,7 @@ async def buy_cmd(msg: Message):
 
     text = "🛒 **Карты в продаже:**\n\n"
     for l in listings:
+        seller = f"<a href='tg://user?id={l['seller_id']}'>продавец</a>"
         text += (
             f"🆔 {l['card_id']} | "
             f"⭐ {l['rarity']} | "
@@ -763,6 +764,7 @@ async def buy_cmd(msg: Message):
         text,
         reply_markup=buy_list_kb(listings, msg.from_user.id),
         parse_mode="Markdown"
+        disable_web_page_preview=True
     )
 
 @dp.callback_query(F.data.startswith("buy_select:"))

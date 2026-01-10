@@ -77,6 +77,28 @@ def init_db():
         );
         """)
 
+        cur.execute("""
+	CREATE TABLE IF NOT EXISTS market_listings (
+	    id SERIAL PRIMARY KEY,
+	    seller_id BIGINT NOT NULL,
+	    card_id INTEGER NOT NULL,
+	    price INTEGER NOT NULL,
+	    status TEXT NOT NULL DEFAULT 'active',
+	    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+	)
+	""")
+
+	cur.execute("""
+	CREATE TABLE IF NOT EXISTS trade_offers (
+	    id SERIAL PRIMARY KEY,
+	    from_user_id BIGINT NOT NULL,
+	    to_user_id BIGINT NOT NULL,
+	    type TEXT CHECK (type IN ('buy','sell')) NOT NULL,
+	    card_id INT NOT NULL,
+	    price INT NOT NULL,
+	    created_at TIMESTAMP DEFAULT NOW()
+	);
+
 
 # ---------- USERS ----------
 def add_user(user_id: int):
@@ -471,8 +493,12 @@ def get_card(card_id):
         return cur.fetchone()
 
 def get_total_cards(user_id: int) -> int:
-    cards = get_collection(user_id)
-    return sum(c["count"] for c in cards)
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT COALESCE(SUM(count), 0) AS total FROM user_cards WHERE user_id = %s",
+            (user_id,)
+        )
+        return cur.fetchone()["total"]
 
 def add_currency(user_id: int, amount: int):
     with conn.cursor() as cur:
@@ -480,3 +506,281 @@ def add_currency(user_id: int, amount: int):
             "UPDATE users SET currency_balance = currency_balance + %s WHERE user_id = %s",
             (amount, user_id)
         )
+
+def create_listing(seller_id: int, card_id: int, price: int) -> int:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO market_listings (seller_id, card_id, price)
+            VALUES (%s, %s, %s)
+            RETURNING id
+            """,
+            (seller_id, card_id, price)
+        )
+        listing_id = cur.fetchone()["id"]
+        return listing_id
+
+def is_card_listed(seller_id: int, card_id: int) -> bool:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT 1 FROM market_listings
+            WHERE seller_id = %s
+              AND card_id = %s
+              AND status = 'active'
+            """,
+            (seller_id, card_id)
+        )
+        return cur.fetchone() is not None
+
+def get_active_listings(limit: int = 5):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                ml.id AS listing_id,
+                ml.card_id,
+                ml.price,
+                ml.seller_id,
+                c.rarity,
+                c.points
+            FROM market_listings ml
+            JOIN cards c ON c.id = ml.card_id
+            WHERE ml.status = 'active'
+            ORDER BY ml.created_at ASC
+            LIMIT %s
+            """,
+            (limit,)
+        )
+        return cur.fetchall()
+
+def get_listing(listing_id: int):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                ml.*,
+                c.image,
+                c.description,
+                c.rarity,
+                c.points
+            FROM market_listings ml
+            JOIN cards c ON c.id = ml.card_id
+            WHERE ml.id = %s
+            """,
+            (listing_id,)
+        )
+        return cur.fetchone()
+
+def get_balance(user_id: int) -> int:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT currency FROM users WHERE user_id = %s",
+            (user_id,)
+        )
+        row = cur.fetchone()
+        return row["currency"] if row else 0
+
+def change_balance(user_id: int, amount: int):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE users
+            SET currency = currency + %s
+            WHERE user_id = %s
+            """,
+            (amount, user_id)
+        )
+
+def buy_listing(buyer_id: int, listing_id: int) -> bool:
+    with conn.cursor() as cur:
+        # блокируем лот
+        cur.execute(
+            """
+            SELECT * FROM market_listings
+            WHERE id = %s AND status = 'active'
+            FOR UPDATE
+            """,
+            (listing_id,)
+        )
+        listing = cur.fetchone()
+        if not listing:
+            return False
+
+        seller_id = listing["seller_id"]
+        card_id = listing["card_id"]
+        price = listing["price"]
+
+        if seller_id == buyer_id:
+            return False
+
+        # проверяем баланс
+        cur.execute(
+            "SELECT currency FROM users WHERE user_id = %s",
+            (buyer_id,)
+        )
+        buyer = cur.fetchone()
+        if not buyer or buyer["currency"] < price:
+            return False
+
+        # проверяем карту у продавца
+        cur.execute(
+            """
+            SELECT count FROM user_cards
+            WHERE user_id = %s AND card_id = %s AND count > 0
+            FOR UPDATE
+            """,
+            (seller_id, card_id)
+        )
+        row = cur.fetchone()
+        if not row:
+            return False
+
+        # списываем валюту
+        cur.execute(
+            "UPDATE users SET currency = currency - %s WHERE user_id = %s",
+            (price, buyer_id)
+        )
+        cur.execute(
+            "UPDATE users SET currency = currency + %s WHERE user_id = %s",
+            (price, seller_id)
+        )
+
+        # перенос карты
+        cur.execute(
+            "UPDATE user_cards SET count = count - 1 WHERE user_id = %s AND card_id = %s",
+            (seller_id, card_id)
+        )
+        cur.execute(
+            """
+            INSERT INTO user_cards (user_id, card_id, count)
+            VALUES (%s, %s, 1)
+            ON CONFLICT (user_id, card_id)
+            DO UPDATE SET count = user_cards.count + 1
+            """,
+            (buyer_id, card_id)
+        )
+
+        # закрываем лот
+        cur.execute(
+            "UPDATE market_listings SET status = 'sold' WHERE id = %s",
+            (listing_id,)
+        )
+        return True
+
+def cancel_listing(listing_id: int, seller_id: int) -> bool:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE market_listings
+            SET status = 'cancelled'
+            WHERE id = %s AND seller_id = %s AND status = 'active'
+            """,
+            (listing_id, seller_id)
+        )
+        if cur.rowcount == 0:
+            return False
+        conn.commit()
+        return True
+
+def get_total_cards(user_id: int) -> int:
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT COALESCE(SUM(count), 0) AS total FROM user_cards WHERE user_id = %s",
+            (user_id,)
+        )
+        return cur.fetchone()["total"]
+
+def create_trade_offer(from_id, to_id, offer_type, card_id, price):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO trade_offers (from_user_id, to_user_id, type, card_id, price)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
+            """,
+            (from_id, to_id, offer_type, card_id, price)
+        )
+        return cur.fetchone()["id"]
+
+def get_trade_offer(offer_id: int):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT o.*, c.name, c.rarity, c.points
+            FROM trade_offers o
+            JOIN cards c ON c.id = o.card_id
+            WHERE o.id = %s
+            """,
+            (offer_id,)
+        )
+        return cur.fetchone()
+
+def accept_trade_offer(offer_id: int) -> bool:
+    with conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT * FROM trade_offers WHERE id = %s FOR UPDATE",
+                (offer_id,)
+            )
+            o = cur.fetchone()
+            if not o:
+                return False
+
+            buyer = o["from_user_id"] if o["type"] == "buy" else o["to_user_id"]
+            seller = o["to_user_id"] if o["type"] == "buy" else o["from_user_id"]
+
+            card_id = o["card_id"]
+            price = o["price"]
+
+            # проверка денег
+            cur.execute(
+                "SELECT currency FROM users WHERE user_id = %s",
+                (buyer,)
+            )
+            if cur.fetchone()["currency"] < price:
+                return False
+
+            # проверка карты
+            cur.execute(
+                """
+                SELECT count FROM user_cards
+                WHERE user_id = %s AND card_id = %s
+                """,
+                (seller, card_id)
+            )
+            row = cur.fetchone()
+            if not row or row["count"] <= 0:
+                return False
+
+            # перевод денег
+            cur.execute(
+                "UPDATE users SET currency = currency - %s WHERE user_id = %s",
+                (price, buyer)
+            )
+            cur.execute(
+                "UPDATE users SET currency = currency + %s WHERE user_id = %s",
+                (price, seller)
+            )
+
+            # перенос карты
+            cur.execute(
+                "UPDATE user_cards SET count = count - 1 WHERE user_id = %s AND card_id = %s",
+                (seller, card_id)
+            )
+            cur.execute(
+                """
+                INSERT INTO user_cards (user_id, card_id, count)
+                VALUES (%s, %s, 1)
+                ON CONFLICT (user_id, card_id)
+                DO UPDATE SET count = user_cards.count + 1
+                """,
+                (buyer, card_id)
+            )
+
+            # удаляем оффер
+            cur.execute(
+                "DELETE FROM trade_offers WHERE id = %s",
+                (offer_id,)
+            )
+            return True

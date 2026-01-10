@@ -685,6 +685,202 @@ async def trade_callback(cb: CallbackQuery):
     await cb.message.edit_text("✅ Обмен успешно завершён")
     await cb.answer("Готово")
 
+# ---------- SELL ----------
+@dp.message(Command("sell"))
+async def sell_cmd(msg: Message):
+    parts = msg.text.split()
+    if len(parts) != 3:
+        return await msg.reply("❌ Формат: /sell <card_id> <price>")
+
+    try:
+        card_id = int(parts[1])
+        price = int(parts[2])
+    except ValueError:
+        return await msg.reply("❌ ID карты и цена должны быть числами")
+
+    if price <= 0:
+        return await msg.reply("❌ Цена должна быть больше нуля")
+
+    user_id = msg.from_user.id
+
+    # есть ли карта
+    card = database.get_user_card(user_id, card_id)
+    if not card:
+        return await msg.reply("❌ У тебя нет этой карты")
+
+    # нельзя продать последнюю карту
+    if database.get_total_cards(user_id) <= 1:
+        return await msg.reply("❌ Нельзя продать последнюю карту")
+
+    # карта уже продаётся?
+    if database.is_card_listed(user_id, card_id):
+        return await msg.reply("❌ Эта карта уже выставлена на продажу")
+
+    # создаём лот
+    listing_id = database.create_listing(
+        seller_id=user_id,
+        card_id=card_id,
+        price=price
+    )
+
+    await msg.reply(
+        "✅ Карта выставлена на продажу\n\n"
+        f"🆔 Карта: {card_id}\n"
+        f"💰 Цена: {price} 🐽\n"
+        f"📦 ID лота: {listing_id}"
+    )
+
+# ---------- BUY ----------
+def buy_list_kb(listings, user_id):
+    buttons = [
+        [
+            InlineKeyboardButton(
+                text=str(l["card_id"]),
+                callback_data=f"buy_select:{l['id']}:{user_id}"
+            )
+        ]
+        for l in listings
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+@dp.message(Command("buy"))
+async def buy_cmd(msg: Message):
+    listings = database.get_active_listings()
+    if not listings:
+        return await msg.reply("🛒 Сейчас нет карт в продаже")
+
+    text = "🛒 **Карты в продаже:**\n\n"
+    for l in listings:
+        text += (
+            f"🆔 {l['card_id']} | "
+            f"⭐ {l['rarity']} | "
+            f"🎯 {l['points']} | "
+            f"💰 {l['price']} 🐽 | "
+            f"👤 {l['seller_name']}\n"
+        )
+
+    await msg.reply(
+        text,
+        reply_markup=buy_list_kb(listings, msg.from_user.id),
+        parse_mode="Markdown"
+    )
+
+@dp.callback_query(F.data.startswith("buy_select:"))
+async def buy_select(cb: CallbackQuery):
+    _, listing_id, owner_id = cb.data.split(":")
+    if cb.from_user.id != int(owner_id):
+        return await cb.answer("❌ Не для тебя", show_alert=True)
+
+    listing = database.get_listing(int(listing_id))
+    if not listing:
+        return await cb.answer("❌ Лот недоступен", show_alert=True)
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔍 Предпросмотр", callback_data=f"buy_preview:{listing_id}:{owner_id}")],
+        [InlineKeyboardButton(text="💰 Купить", callback_data=f"buy_confirm:{listing_id}:{owner_id}")],
+        [InlineKeyboardButton(text="⬅ Назад", callback_data=f"buy_back:{owner_id}")]
+    ])
+
+    await cb.message.edit_text(
+        f"🃏 Карта {listing['card_id']}\n"
+        f"⭐ Редкость: {listing['rarity']}\n"
+        f"🎯 Очки: {listing['points']}\n"
+        f"💰 Цена: {listing['price']} 🐽",
+        reply_markup=kb
+    )
+
+@dp.callback_query(F.data.startswith("buy_confirm:"))
+async def buy_confirm(cb: CallbackQuery):
+    _, listing_id, owner_id = cb.data.split(":")
+    if cb.from_user.id != int(owner_id):
+        return await cb.answer("❌ Не для тебя", show_alert=True)
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"buy_do:{listing_id}:{owner_id}")],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data=f"buy_back:{owner_id}")]
+    ])
+
+    await cb.message.edit_reply_markup(reply_markup=kb)
+
+@dp.callback_query(F.data.startswith("buy_do:"))
+async def buy_do(cb: CallbackQuery):
+    _, listing_id, owner_id = cb.data.split(":")
+    if cb.from_user.id != int(owner_id):
+        return await cb.answer("❌ Не для тебя", show_alert=True)
+
+    success = database.buy_listing(cb.from_user.id, int(listing_id))
+    if not success:
+        return await cb.message.edit_text("❌ Покупка не удалась")
+
+    await cb.message.edit_text("✅ Покупка успешна!")
+
+# ---------- OFFERS ----------
+@dp.message(Command("offer"))
+async def offer_cmd(msg: Message):
+    args = msg.text.split()
+    if len(args) != 5:
+        return await msg.reply("Использование: /offer @user <buy|sell> <card_id> <price>")
+
+    mention, offer_type, card_id, price = args[1:]
+
+    if offer_type not in ("buy", "sell"):
+        return await msg.reply("Тип должен быть buy или sell")
+
+    card_id = int(card_id)
+    price = int(price)
+
+    to_user = await bot.get_chat(mention)
+    if not to_user:
+        return await msg.reply("Пользователь не найден")
+
+    offer_id = database.create_trade_offer(
+        msg.from_user.id,
+        to_user.id,
+        offer_type,
+        card_id,
+        price
+    )
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Принять", callback_data=f"offer_accept:{offer_id}:{to_user.id}"),
+            InlineKeyboardButton(text="❌ Отказаться", callback_data=f"offer_decline:{offer_id}:{to_user.id}")
+        ]
+    ])
+
+    await bot.send_message(
+        to_user.id,
+        f"📨 Новое предложение\n\n"
+        f"Тип: {offer_type}\n"
+        f"🃏 Карта: {card_id}\n"
+        f"💰 Цена: {price} 🐽\n"
+        f"👤 От: {msg.from_user.full_name}",
+        reply_markup=kb
+    )
+
+    await msg.reply("✅ Предложение отправлено")
+
+@dp.callback_query(F.data.startswith("offer_accept:"))
+async def offer_accept(cb: CallbackQuery):
+    _, offer_id, target_id = cb.data.split(":")
+    if cb.from_user.id != int(target_id):
+        return await cb.answer("❌ Не для тебя", show_alert=True)
+
+    success = database.accept_trade_offer(int(offer_id))
+    if not success:
+        return await cb.message.edit_text("❌ Сделка невозможна")
+
+    await cb.message.edit_text("✅ Сделка завершена")
+
+@dp.callback_query(F.data.startswith("offer_decline:"))
+async def offer_decline(cb: CallbackQuery):
+    _, offer_id, target_id = cb.data.split(":")
+    if cb.from_user.id != int(target_id):
+        return await cb.answer("❌ Не для тебя", show_alert=True)
+
+    database.delete_trade_offer(int(offer_id))
+    await cb.message.edit_text("❌ Предложение отклонено")
+
 # ---------- RUN ----------
 async def main():
     database.init_db()

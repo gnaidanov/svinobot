@@ -326,3 +326,39 @@ def top_cards(limit=10):
     with conn.cursor() as cur:
         cur.execute("SELECT u.user_id, COALESCE(SUM(uc.count), 0) AS cards FROM users u LEFT JOIN user_cards uc ON uc.user_id = u.user_id GROUP BY u.user_id ORDER BY cards DESC LIMIT %s", (limit,))
         return cur.fetchall()
+
+def get_active_listings(limit=10):
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                ml.id,
+                ml.seller_id,
+                ml.card_id,
+                ml.price,
+                c.rarity,
+                c.points
+            FROM market_listings ml
+            JOIN cards c ON c.id = ml.card_id
+            WHERE ml.status = 'active'
+            ORDER BY ml.created_at DESC
+            LIMIT %s
+        """, (limit,))
+        return cur.fetchall()
+
+def get_listing(listing_id: int):
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                ml.id,
+                ml.seller_id,
+                ml.card_id,
+                ml.price,
+                c.rarity,
+                c.points,
+                c.image,
+                c.description
+            FROM market_listings ml
+            JOIN cards c ON c.id = ml.card_id
+            WHERE ml.id = %s AND ml.status = 'active'
+        """, (listing_id,))
+        return cur.fetchone()

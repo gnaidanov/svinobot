@@ -763,7 +763,7 @@ async def buy_cmd(msg: Message):
     await msg.reply(
         text,
         reply_markup=buy_list_kb(listings, msg.from_user.id),
-        parse_mode="Markdown",
+        parse_mode="HTML",
         disable_web_page_preview=True
     )
 
@@ -816,22 +816,72 @@ async def buy_do(cb: CallbackQuery):
 
     await cb.message.edit_text("✅ Покупка успешна!")
 
+@dp.callback_query(F.data.startswith("buy_preview:"))
+async def buy_preview(cb: CallbackQuery):
+    _, listing_id, owner_id = cb.data.split(":")
+    if cb.from_user.id != int(owner_id):
+        return await cb.answer("❌ Не для тебя", show_alert=True)
+
+    listing = database.get_listing(int(listing_id))
+    if not listing:
+        return await cb.answer("❌ Лот недоступен", show_alert=True)
+
+    text = (
+        f"🃏 Карта {listing['card_id']}\n"
+        f"⭐ Редкость: {listing['rarity']}\n"
+        f"🎯 Очки: {listing['points']}\n"
+        f"💰 Цена: {listing['price']} 🐽"
+    )
+
+    await cb.answer()  # чтобы Telegram не ругался
+    await cb.message.edit_text(text, reply_markup=cb.message.reply_markup)
+
+@dp.callback_query(F.data.startswith("buy_back:"))
+async def buy_back(cb: CallbackQuery):
+    _, owner_id = cb.data.split(":")
+    if cb.from_user.id != int(owner_id):
+        return await cb.answer("❌ Не для тебя", show_alert=True)
+
+    listings = database.get_active_listings()
+    if not listings:
+        return await cb.message.edit_text("🛒 Сейчас нет карт в продаже")
+
+    text = "🛒 **Карты в продаже:**\n\n"
+    for l in listings:
+        seller = f"<a href='tg://user?id={l['seller_id']}'>продавец</a>"
+        text += (
+            f"🆔 {l['card_id']} | "
+            f"⭐ {l['rarity']} | "
+            f"🎯 {l['points']} | "
+            f"💰 {l['price']} 🐽 | "
+            f"👤 {seller}\n"
+        )
+
+    await cb.message.edit_text(
+        text,
+        reply_markup=buy_list_kb(listings, cb.from_user.id),
+        parse_mode="HTML",
+        disable_web_page_preview=True
+    )
+
 # ---------- OFFERS ----------
 @dp.message(Command("offer"))
 async def offer_cmd(msg: Message):
+    if not msg.reply_to_message:
+        return await msg.reply("❌ Используй команду ответом на сообщение игрока")
+
     args = msg.text.split()
-    if len(args) != 5:
-        return await msg.reply("Использование: /offer @user <buy|sell> <card_id> <price>")
+    if len(args) != 4:
+        return await msg.reply("Использование: /offer <buy|sell> <card_id> <price>")
 
-    mention, offer_type, card_id, price = args[1:]
-
+    offer_type, card_id, price = args[1:]
     if offer_type not in ("buy", "sell"):
         return await msg.reply("Тип должен быть buy или sell")
 
     card_id = int(card_id)
     price = int(price)
 
-    to_user = await bot.get_chat(mention)
+    to_user = msg.reply_to_message.from_user
     if not to_user:
         return await msg.reply("Пользователь не найден")
 

@@ -319,13 +319,14 @@ def top_points(limit=10):
 
 def top_currency(limit=10):
     with conn.cursor() as cur:
-        cur.execute("SELECT user_id, currency_balance FROM users ORDER BY currency_balance DESC LIMIT %s", (limit,))
+        cur.execute("SELECT user_id, currency_balance AS currency FROM users ORDER BY currency_balance DESC LIMIT %s", (limit,))
         return cur.fetchall()
 
 def top_cards(limit=10):
     with conn.cursor() as cur:
         cur.execute("SELECT u.user_id, COALESCE(SUM(uc.count), 0) AS cards FROM users u LEFT JOIN user_cards uc ON uc.user_id = u.user_id GROUP BY u.user_id ORDER BY cards DESC LIMIT %s", (limit,))
         return cur.fetchall()
+
 
 def get_active_listings(limit=10):
     with conn.cursor() as cur:

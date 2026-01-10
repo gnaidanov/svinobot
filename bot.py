@@ -757,7 +757,7 @@ async def buy_cmd(msg: Message):
             f"⭐ {l['rarity']} | "
             f"🎯 {l['points']} | "
             f"💰 {l['price']} 🐽 | "
-            f"👤 {l['seller_name']}\n"
+            f"👤 {seller}\n"
         )
 
     await msg.reply(

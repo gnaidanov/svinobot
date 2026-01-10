@@ -819,22 +819,30 @@ async def buy_do(cb: CallbackQuery):
 @dp.callback_query(F.data.startswith("buy_preview:"))
 async def buy_preview(cb: CallbackQuery):
     _, listing_id, owner_id = cb.data.split(":")
-    if cb.from_user.id != int(owner_id):
-        return await cb.answer("❌ Не для тебя", show_alert=True)
+    owner_id = int(owner_id)
+
+    if cb.from_user.id != owner_id:
+        return await cb.answer("❌ Это не твоя кнопка", show_alert=True)
 
     listing = database.get_listing(int(listing_id))
     if not listing:
         return await cb.answer("❌ Лот недоступен", show_alert=True)
 
-    text = (
-        f"🃏 Карта {listing['card_id']}\n"
-        f"⭐ Редкость: {listing['rarity']}\n"
-        f"🎯 Очки: {listing['points']}\n"
-        f"💰 Цена: {listing['price']} 🐽"
-    )
+    card = database.get_card_by_id(listing["card_id"])
+    if not card:
+        return await cb.answer("❌ Карта не найдена", show_alert=True)
 
-    await cb.answer()  # чтобы Telegram не ругался
-    await cb.message.edit_text(text, reply_markup=cb.message.reply_markup)
+    await cb.message.answer_photo(
+        photo=card["image"],
+        caption=(
+            f"💳 {card['description']}\n\n"
+            f"👑 {RARITY_RU_MAP.get(card['rarity'], card['rarity'])}\n"
+            f"+{card['points']} 🕶 | +{card['currency']} 🐽\n\n"
+            f"💰 Цена: {listing['price']} 🐽\n"
+            f"🆔 ID: {card['id']}"
+        )
+    )
+    await cb.answer()  # убирает "часики"
 
 @dp.callback_query(F.data.startswith("buy_back:"))
 async def buy_back(cb: CallbackQuery):

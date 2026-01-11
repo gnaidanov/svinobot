@@ -867,7 +867,7 @@ async def buy_preview(cb: CallbackQuery):
         reply_markup=buy_preview_kb(int(listing_id), owner_id)
     )
 
-    Await cb.answer()
+    await cb.answer()
 
 @dp.callback_query(F.data.startswith("buy_back:"))
 async def buy_back(cb: CallbackQuery):

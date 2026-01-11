@@ -371,4 +371,5 @@ def create_trade_offer(from_user_id, to_user_id, type, card_id, price):
             VALUES (%s, %s, %s, %s, %s)
             RETURNING id
         """, (from_user_id, to_user_id, type, card_id, price))
-        return cur.fetchone()[0]
+        row = cur.fetchone()
+        return row["id"]

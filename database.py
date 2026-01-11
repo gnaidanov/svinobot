@@ -363,3 +363,12 @@ def get_listing(listing_id: int):
             WHERE ml.id = %s AND ml.status = 'active'
         """, (listing_id,))
         return cur.fetchone()
+
+def create_trade_offer(from_user_id, to_user_id, type, card_id, price):
+    with conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO trade_offers (from_user_id, to_user_id, type, card_id, price)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
+        """, (from_user_id, to_user_id, type, card_id, price))
+        return cur.fetchone()[0]

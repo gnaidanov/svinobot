@@ -832,6 +832,16 @@ def buy_preview_kb(listing_id: int, owner_id: int):
         ]
     ])
 
+@dp.callback_query(F.data.startswith("buy_preview_close:"))
+async def buy_preview_close(cb: CallbackQuery):
+    _, owner_id = cb.data.split(":")
+    owner_id = int(owner_id)
+
+    if cb.from_user.id != owner_id:
+        return await cb.answer("❌ Это не твоя кнопка", show_alert=True)
+
+    await cb.message.delete()
+
 async def auto_delete(msg: Message, delay: int = 60):
     await asyncio.sleep(delay)
     try:

@@ -909,72 +909,67 @@ async def buy_back(cb: CallbackQuery):
 
 # ---------- OFFERS ----------
 @dp.message(Command("offer"))
-async def offer_cmd(msg: Message):
-    if not msg.reply_to_message:
-        return await msg.reply("❌ Используй команду ответом на сообщение игрока")
-
+async def offer_cmd(msg: types.Message):
     args = msg.text.split()
+
     if len(args) != 4:
-        return await msg.reply("Использование: /offer <buy|sell> <card_id> <price>")
+        await msg.answer("Использование: /offer <buy|sell> <card_id> <price>")
+        return
 
-    offer_type, card_id, price = args[1:]
-    if offer_type not in ("buy", "sell"):
-        return await msg.reply("Тип должен быть buy или sell")
+    offer_type, card_id, price = args[1], int(args[2]), int(args[3])
+    from_user = msg.from_user.id
 
-    card_id = int(card_id)
-    price = int(price)
+    reply = msg.reply_to_message
+    if not reply:
+        await msg.answer("❌ Ответь на сообщение игрока, которому делаешь предложение")
+        return
 
-    to_user = msg.reply_to_message.from_user
-    if not to_user:
-        return await msg.reply("Пользователь не найден")
+    to_user = reply.from_user.id
 
     offer_id = database.create_trade_offer(
-        msg.from_user.id,
-        to_user.id,
-        offer_type,
-        card_id,
-        price
+        from_user, to_user, offer_type, card_id, price
     )
 
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="✅ Принять", callback_data=f"offer_accept:{offer_id}:{to_user.id}"),
-            InlineKeyboardButton(text="❌ Отказаться", callback_data=f"offer_decline:{offer_id}:{to_user.id}")
-        ]
-    ])
-
-    await bot.send_message(
-        to_user.id,
-        f"📨 Новое предложение\n\n"
-        f"Тип: {offer_type}\n"
-        f"🃏 Карта: {card_id}\n"
-        f"💰 Цена: {price} 🐽\n"
-        f"👤 От: {msg.from_user.full_name}",
-        reply_markup=kb
+    text = (
+        f"📨 Торговое предложение\n\n"
+        f"От: {msg.from_user.full_name}\n"
+        f"Тип: {offer_type.upper()}\n"
+        f"🆔 Карта: {card_id}\n"
+        f"💰 Цена: {price} 🐽"
     )
 
-    await msg.reply("✅ Предложение отправлено")
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ Принять", callback_data=f"offer_accept:{offer_id}"),
+        InlineKeyboardButton(text="❌ Отклонить", callback_data=f"offer_decline:{offer_id}")
+    ]])
+
+    await msg.answer(text, reply_markup=kb)
 
 @dp.callback_query(F.data.startswith("offer_accept:"))
-async def offer_accept(cb: CallbackQuery):
-    _, offer_id, target_id = cb.data.split(":")
-    if cb.from_user.id != int(target_id):
-        return await cb.answer("❌ Не для тебя", show_alert=True)
+async def offer_accept(cb: types.CallbackQuery):
+    offer_id = int(cb.data.split(":")[1])
+    offer = database.get_trade_offer(offer_id)
 
-    success = database.accept_trade_offer(int(offer_id))
-    if not success:
-        return await cb.message.edit_text("❌ Сделка невозможна")
+    if cb.from_user.id != offer["to_user_id"]:
+        await cb.answer("❌ Это предложение не для тебя", show_alert=True)
+        return
 
-    await cb.message.edit_text("✅ Сделка завершена")
+    database.complete_trade_offer(offer_id)
+
+    await cb.message.edit_text("✅ Сделка принята")
 
 @dp.callback_query(F.data.startswith("offer_decline:"))
-async def offer_decline(cb: CallbackQuery):
-    _, offer_id, target_id = cb.data.split(":")
-    if cb.from_user.id != int(target_id):
-        return await cb.answer("❌ Не для тебя", show_alert=True)
+async def offer_decline(cb: types.CallbackQuery):
+    offer_id = int(cb.data.split(":")[1])
+    offer = database.get_trade_offer(offer_id)
 
-    database.delete_trade_offer(int(offer_id))
-    await cb.message.edit_text("❌ Предложение отклонено")
+    if cb.from_user.id != offer["to_user_id"]:
+        await cb.answer("❌ Это предложение не для тебя", show_alert=True)
+        return
+
+    database.cancel_trade_offer(offer_id)
+
+    await cb.message.edit_text("❌ Сделка отклонена")
 
 # ---------- RUN ----------
 async def main():

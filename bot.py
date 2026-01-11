@@ -816,6 +816,29 @@ async def buy_do(cb: CallbackQuery):
 
     await cb.message.edit_text("✅ Покупка успешна!")
 
+def buy_preview_kb(listing_id: int, owner_id: int):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="💰 Купить",
+                callback_data=f"buy_confirm:{listing_id}:{owner_id}"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="❌ Закрыть",
+                callback_data=f"buy_preview_close:{owner_id}"
+            )
+        ]
+    ])
+
+async def auto_delete(msg: Message, delay: int = 60):
+    await asyncio.sleep(delay)
+    try:
+        await msg.delete()
+    except Exception:
+        pass
+
 @dp.callback_query(F.data.startswith("buy_preview:"))
 async def buy_preview(cb: CallbackQuery):
     _, listing_id, owner_id = cb.data.split(":")
@@ -840,9 +863,11 @@ async def buy_preview(cb: CallbackQuery):
             f"+{card['points']} 🕶 | +{card['currency']} 🐽\n\n"
             f"💰 Цена: {listing['price']} 🐽\n"
             f"🆔 ID: {card['id']}"
-        )
+        ),
+        reply_markup=buy_preview_kb(int(listing_id), owner_id)
     )
-    await cb.answer()  # убирает "часики"
+
+    Await cb.answer()
 
 @dp.callback_query(F.data.startswith("buy_back:"))
 async def buy_back(cb: CallbackQuery):

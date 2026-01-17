@@ -1,6 +1,8 @@
 import time
 import random
 import asyncio
+from fastapi import FastAPI
+import uvicorn
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -18,6 +20,12 @@ from config import API_TOKEN, DROP_COOLDOWN, RARITIES, RARITY_RU_MAP, ADMIN_IDS
 load_dotenv()
 bot = Bot(API_TOKEN)
 dp = Dispatcher()
+
+app = FastAPI()
+
+@app.get("/")
+async def root():
+    return {"status": "ok"}
 
 CARDS_PER_PAGE = 25
 
@@ -979,5 +987,12 @@ async def main():
     database.init_db()
     await dp.start_polling(bot)
 
+def start_web():
+    port = int(os.getenv("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
 if __name__ == "__main__":
+    import threading
+
+    threading.Thread(target=start_web).start()
     asyncio.run(main())

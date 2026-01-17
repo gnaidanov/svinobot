@@ -978,6 +978,8 @@ async def offer_decline(cb: types.CallbackQuery):
     await cb.message.edit_text("❌ Сделка отклонена")
 
 # ---------- RUN ----------
+print("API_TOKEN =", os.getenv("API_TOKEN"))
+
 async def handle(request):
     return web.Response(text="ok")
 

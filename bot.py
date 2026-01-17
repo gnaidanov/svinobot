@@ -933,6 +933,7 @@ async def offer_cmd(msg: types.Message):
     text = (
         f"📨 Торговое предложение\n\n"
         f"От: {msg.from_user.full_name}\n"
+        f"Кому: {reply.from_user.full_name}\n"
         f"Тип: {offer_type.upper()}\n"
         f"🆔 Карта: {card_id}\n"
         f"💰 Цена: {price} 🐽"
@@ -943,7 +944,7 @@ async def offer_cmd(msg: types.Message):
         InlineKeyboardButton(text="❌ Отклонить", callback_data=f"offer_decline:{offer_id}")
     ]])
 
-    await msg.answer(text, reply_markup=kb)
+    await msg.answer(text, reply_markup=kb, reply_to_message_id=reply.message_id)
 
 @dp.callback_query(F.data.startswith("offer_accept:"))
 async def offer_accept(cb: types.CallbackQuery):
@@ -956,6 +957,7 @@ async def offer_accept(cb: types.CallbackQuery):
 
     database.complete_trade_offer(offer_id)
 
+    await cb.message.edit_reply_markup(reply_markup=None)
     await cb.message.edit_text("✅ Сделка принята")
 
 @dp.callback_query(F.data.startswith("offer_decline:"))
@@ -969,6 +971,7 @@ async def offer_decline(cb: types.CallbackQuery):
 
     database.cancel_trade_offer(offer_id)
 
+    await cb.message.edit_reply_markup(reply_markup=None)
     await cb.message.edit_text("❌ Сделка отклонена")
 
 # ---------- RUN ----------

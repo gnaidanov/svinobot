@@ -758,8 +758,7 @@ def is_chat_paid(chat_id: int) -> bool:
             return cur.fetchone() is not None
 
 def has_67_access(user_id: int, chat_id: int) -> bool:
-    """Проверяет общий доступ (либо личный, либо чата)"""
-    return is_user_paid(user_id) or is_chat_paid(chat_id)
+    return false
 
 def add_paid_user(user_id: int):
     """Сохраняет пользователя как оплатившего"""

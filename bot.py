@@ -8,7 +8,7 @@ import re
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, CallbackQuery, ReplyParameters
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, CallbackQuery, ReplyParameters, LabeledPrice, PreCheckoutQuery
 
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -1996,20 +1996,36 @@ RANDOM_PHOTOS = [
     "AgACAgQAAyEFAASu1VyOAAIGEmoS0znD4n-oPnpqPFRxoFUS8yzVAALvDWsb9B-ZUL9j1DDDmbuoAQADAgADeQADOwQ"
 ]
 
+# 1. Проверка доступа в основном хэндлере "67"
 @dp.message(F.text.lower().regexp(r"67"))
 async def photo_quote_reply(msg: Message):
+    user_id = msg.from_user.id
+    chat_id = msg.chat.id
+
+    # Используем проверку из базы данных
+    if not database.has_67_access(user_id, chat_id):
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⭐ Оплатить 1 ⭐️ (для себя)", callback_data="buy_67_user")],
+            [InlineKeyboardButton(text="🌟 Оплатить 67 ⭐️ (для всего чата)", callback_data="buy_67_chat")]
+        ])
+        
+        await msg.reply(
+            "🔒 **Эта функция теперь платная!**\n\n"
+            "Чтобы продолжать использовать триггер «67», выберите вариант разблокировки:",
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        return
+
+    # Логика отправки фото (выполняется, если доступ есть)
     text_lower = msg.text.lower()
-    trigger = "67"
-    
-    # Ищем позицию
-    match = re.search(rf"\b{trigger}\b", text_lower)
+    match = re.search(r"67", text_lower)
     if not match or not RANDOM_PHOTOS:
         return
 
     start_pos = match.start()
     original_word = msg.text[start_pos : match.end()]
     
-    # 1. Сначала отправляем ФОТО (основное действие)
     try:
         reply_params = ReplyParameters(
             message_id=msg.message_id,
@@ -2024,10 +2040,22 @@ async def photo_quote_reply(msg: Message):
         )
     except Exception as e:
         print(f"Ошибка при отправке фото-цитаты: {e}")
-        # Если цитата не прошла, отправляем просто реплаем и выходим
         await msg.reply_photo(photo=random.choice(RANDOM_PHOTOS))
-        # Важно: здесь логику уведомления можно пропустить или тоже обернуть в try
 
+# 2. Сохранение успешной оплаты в БД
+@dp.message(F.successful_payment)
+async def process_successful_payment(msg: Message):
+    payload = msg.successful_payment.invoice_payload
+
+    if payload.startswith("pay_67_user_"):
+        user_id = int(payload.replace("pay_67_user_", ""))
+        database.add_paid_user(user_id)  # Сохраняем в PostgreSQL
+        await msg.reply("🎉 **Оплата прошла успешно!** Теперь вы можете использовать триггер 67 во всех чатах.")
+
+    elif payload.startswith("pay_67_chat_"):
+        chat_id = int(payload.replace("pay_67_chat_", ""))
+        database.add_paid_chat(chat_id)  # Сохраняем в PostgreSQL
+        await msg.reply("🎉 **Оплата прошла успешно!** Функция 67 разблокирована для всех участников этого чата.")
     # 2. ОТДЕЛЬНО отправляем уведомление
     try:
         if msg.chat.id != MY_ID:

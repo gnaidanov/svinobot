@@ -108,6 +108,21 @@ def init_db():
             );
             ''')
 
+            # Таблицы для платного доступа к функциям (например, "67")
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS paid_users (
+                user_id BIGINT PRIMARY KEY,
+                paid_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS paid_chats (
+                chat_id BIGINT PRIMARY KEY,
+                paid_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
             # Добавляем недостающие колонки в существующую таблицу
             cur.execute("ALTER TABLE inventories ADD COLUMN IF NOT EXISTS item_icon TEXT DEFAULT '🍄';")
             cur.execute("ALTER TABLE inventories ADD COLUMN IF NOT EXISTS weight FLOAT DEFAULT 0.0;")
@@ -724,4 +739,38 @@ def add_chat_to_banned(chat_id: int):
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("INSERT INTO banned_chats (chat_id) VALUES (%s) ON CONFLICT DO NOTHING", (chat_id,))
+        conn.commit()
+
+# --- ПЛАТНЫЕ ФУНКЦИИ (67) ---
+
+def is_user_paid(user_id: int) -> bool:
+    """Проверяет, оплатил ли пользователь личный доступ"""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM paid_users WHERE user_id = %s", (user_id,))
+            return cur.fetchone() is not None
+
+def is_chat_paid(chat_id: int) -> bool:
+    """Проверяет, куплен ли доступ для всего чата"""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM paid_chats WHERE chat_id = %s", (chat_id,))
+            return cur.fetchone() is not None
+
+def has_67_access(user_id: int, chat_id: int) -> bool:
+    """Проверяет общий доступ (либо личный, либо чата)"""
+    return is_user_paid(user_id) or is_chat_paid(chat_id)
+
+def add_paid_user(user_id: int):
+    """Сохраняет пользователя как оплатившего"""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO paid_users (user_id) VALUES (%s) ON CONFLICT DO NOTHING", (user_id,))
+        conn.commit()
+
+def add_paid_chat(chat_id: int):
+    """Сохраняет чат как оплативший"""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO paid_chats (chat_id) VALUES (%s) ON CONFLICT DO NOTHING", (chat_id,))
         conn.commit()

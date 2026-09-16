@@ -1,0 +1,21 @@
+# fly.toml app configuration file generated for tgbot1 on 2026-01-18T14:58:24+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = "tgbot1"
+primary_region = "ams"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+
+  auto_start_machines = false
+  auto_stop_machines = false
+  min_machines_running = 1
+  processes = ["app"]
+
+[[vm]]
+  cpus = 1
+  memory = "256mb"
+

@@ -1996,6 +1996,11 @@ RANDOM_PHOTOS = [
     "AgACAgQAAyEFAASu1VyOAAIGEmoS0znD4n-oPnpqPFRxoFUS8yzVAALvDWsb9B-ZUL9j1DDDmbuoAQADAgADeQADOwQ"
 ]
 
+def buy_preview_kb(listing_id: int, user_id: int):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ Закрыть", callback_data=f"buy_preview_close:{user_id}")]
+    ])
+
 # 1. При перехвате "67" проверяем доступ
 @dp.message(F.text.lower().regexp(r"67"))
 async def photo_quote_reply(msg: Message):

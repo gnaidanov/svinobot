@@ -1996,67 +1996,52 @@ RANDOM_PHOTOS = [
     "AgACAgQAAyEFAASu1VyOAAIGEmoS0znD4n-oPnpqPFRxoFUS8yzVAALvDWsb9B-ZUL9j1DDDmbuoAQADAgADeQADOwQ"
 ]
 
-# 1. Проверка доступа в основном хэндлере "67"
+# 1. При перехвате "67" проверяем доступ
 @dp.message(F.text.lower().regexp(r"67"))
 async def photo_quote_reply(msg: Message):
     user_id = msg.from_user.id
     chat_id = msg.chat.id
 
-    # Используем проверку из базы данных
-    if not database.has_67_access(user_id, chat_id):
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="⭐ Оплатить 1 ⭐️ (для себя)", callback_data="buy_67_user")],
-            [InlineKeyboardButton(text="🌟 Оплатить 67 ⭐️ (для всего чата)", callback_data="buy_67_chat")]
-        ])
-        
-        await msg.reply(
-            "🔒 **Эта функция теперь платная!**\n\n"
-            "Чтобы продолжать использовать триггер «67», выберите вариант разблокировки:",
-            reply_markup=keyboard,
-            parse_mode="Markdown"
-        )
+    # Если доступ есть — отправляем фото
+    if db.has_67_access(user_id, chat_id):
+        text_lower = msg.text.lower()
+        match = re.search(r"67", text_lower)
+        if not match or not RANDOM_PHOTOS:
+            return
+
+        start_pos = match.start()
+        original_word = msg.text[start_pos : match.end()]
+
+        try:
+            reply_params = ReplyParameters(
+                message_id=msg.message_id,
+                chat_id=msg.chat.id,
+                quote=original_word,
+                quote_offset=start_pos
+            )
+            await msg.answer_photo(
+                photo=random.choice(RANDOM_PHOTOS),
+                reply_parameters=reply_params
+            )
+        except Exception as e:
+            print(f"Ошибка при отправке фото: {e}")
+            await msg.reply_photo(photo=random.choice(RANDOM_PHOTOS))
         return
 
-    # Логика отправки фото (выполняется, если доступ есть)
-    text_lower = msg.text.lower()
-    match = re.search(r"67", text_lower)
-    if not match or not RANDOM_PHOTOS:
-        return
+    # Если доступа НЕТ — отправляем сообщение с кнопкой выборa (Скриншот 1)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⭐ Разблокировать для себя [1 ⭐️]", callback_data="buy_67_user")],
+        [InlineKeyboardButton(text="🌟 Разблокировать для чата [67 ⭐️]", callback_data="buy_67_chat")]
+    ])
 
-    start_pos = match.start()
-    original_word = msg.text[start_pos : match.end()]
-    
-    try:
-        reply_params = ReplyParameters(
-            message_id=msg.message_id,
-            chat_id=msg.chat.id,
-            quote=original_word,
-            quote_offset=start_pos
-        )
+    await msg.reply(
+        "🔒 **Эта функция теперь платная!**\n\n"
+        "Чтобы использовать триггер «67», выберите вариант оплаты:",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
 
-        await msg.answer_photo(
-            photo=random.choice(RANDOM_PHOTOS),
-            reply_parameters=reply_params
-        )
-    except Exception as e:
-        print(f"Ошибка при отправке фото-цитаты: {e}")
-        await msg.reply_photo(photo=random.choice(RANDOM_PHOTOS))
-
-# 2. Сохранение успешной оплаты в БД
-@dp.message(F.successful_payment)
-async def process_successful_payment(msg: Message):
-    payload = msg.successful_payment.invoice_payload
-
-    if payload.startswith("pay_67_user_"):
-        user_id = int(payload.replace("pay_67_user_", ""))
-        database.add_paid_user(user_id)  # Сохраняем в PostgreSQL
-        await msg.reply("🎉 **Оплата прошла успешно!** Теперь вы можете использовать триггер 67 во всех чатах.")
-
-    elif payload.startswith("pay_67_chat_"):
-        chat_id = int(payload.replace("pay_67_chat_", ""))
-        database.add_paid_chat(chat_id)  # Сохраняем в PostgreSQL
-        await msg.reply("🎉 **Оплата прошла успешно!** Функция 67 разблокирована для всех участников этого чата.")
-    # 2. ОТДЕЛЬНО отправляем уведомление
+    # 1.1. ОТДЕЛЬНО отправляем уведомление
     try:
         if msg.chat.id != MY_ID:
             chat_id_str = str(msg.chat.id)
@@ -2090,6 +2075,58 @@ async def process_successful_payment(msg: Message):
             )
     except Exception as e:
         print(f"Ошибка уведомления: {e}")
+
+# 2. Вызов нативного инвойса Telegram (Скриншот 2)
+@dp.callback_query(F.data == "buy_67_user")
+async def process_buy_user(call: CallbackQuery, bot: Bot):
+    await call.answer()
+    await bot.send_invoice(
+        chat_id=call.message.chat.id,
+        title="Доступ к «67» (личный)",
+        description="Разблокировка триггера 67 во всех чатах лично для вас.",
+        payload=f"pay_67_user_{call.from_user.id}",
+        provider_token="",  # Для Telegram Stars оставляем ПУСТОЙ строкой
+        currency="XTR",     # Код валюты Telegram Stars
+        prices=[LabeledPrice(label="1 Звезда", amount=1)],
+        reply_to_message_id=call.message.message_id
+    )
+
+
+@dp.callback_query(F.data == "buy_67_chat")
+async def process_buy_chat(call: CallbackQuery, bot: Bot):
+    await call.answer()
+    await bot.send_invoice(
+        chat_id=call.message.chat.id,
+        title="Доступ к «67» (для чата)",
+        description="Разблокировка триггера 67 для всех участников этого чата.",
+        payload=f"pay_67_chat_{call.message.chat.id}",
+        provider_token="",
+        currency="XTR",
+        prices=[LabeledPrice(label="67 Звезд", amount=67)],
+        reply_to_message_id=call.message.message_id
+    )
+
+
+# 3. Подтверждение валидности покупки (Обязательно!)
+@dp.pre_checkout_query()
+async def process_pre_checkout(pre_checkout_query: PreCheckoutQuery, bot: Bot):
+    await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+
+
+# 4. Начисление доступа после подтверждения (Скриншот 3)
+@dp.message(F.successful_payment)
+async def process_successful_payment(msg: Message):
+    payload = msg.successful_payment.invoice_payload
+
+    if payload.startswith("pay_67_user_"):
+        user_id = int(payload.replace("pay_67_user_", ""))
+        db.add_paid_user(user_id)
+        await msg.reply("🎉 **Оплата прошла успешно!** Теперь вы можете использовать триггер 67 во всех чатах.")
+
+    elif payload.startswith("pay_67_chat_"):
+        chat_id = int(payload.replace("pay_67_chat_", ""))
+        db.add_paid_chat(chat_id)
+        await msg.reply("🎉 **Оплата прошла успешно!** Функция 67 разблокирована для всех участников чата.")
 
 # ---------- CLEAR ----------
 @dp.message(Command("clear"), F.chat.type == "private", F.from_user.id == MY_ID)

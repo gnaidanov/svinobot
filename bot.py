@@ -2003,7 +2003,7 @@ async def photo_quote_reply(msg: Message):
     chat_id = msg.chat.id
 
     # Если доступ есть — отправляем фото
-    if db.has_67_access(user_id, chat_id):
+    if database.has_67_access(user_id, chat_id):
         text_lower = msg.text.lower()
         match = re.search(r"67", text_lower)
         if not match or not RANDOM_PHOTOS:
@@ -2061,7 +2061,7 @@ async def photo_quote_reply(msg: Message):
             
             # Формируем текст через HTML
             notification_text = (
-                f"🎯 <b>Бот ответил на слово '{trigger}'</b>\n\n"
+                f"🎯 <b>Бот ответил на слово '{original_word}'</b>\n\n"
                 f"👤 <b>Отправитель:</b> {user_name}\n"
                 f"💬 <b>Чат:</b> {chat_title}\n"
                 f"🔗 <a href='{msg_link}'>Перейти к сообщению</a>"
@@ -2120,12 +2120,12 @@ async def process_successful_payment(msg: Message):
 
     if payload.startswith("pay_67_user_"):
         user_id = int(payload.replace("pay_67_user_", ""))
-        db.add_paid_user(user_id)
+        database.add_paid_user(user_id)
         await msg.reply("🎉 **Оплата прошла успешно!** Теперь вы можете использовать триггер 67 во всех чатах.")
 
     elif payload.startswith("pay_67_chat_"):
         chat_id = int(payload.replace("pay_67_chat_", ""))
-        db.add_paid_chat(chat_id)
+        database.add_paid_chat(chat_id)
         await msg.reply("🎉 **Оплата прошла успешно!** Функция 67 разблокирована для всех участников чата.")
 
 # ---------- CLEAR ----------

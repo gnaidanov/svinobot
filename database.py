@@ -714,6 +714,10 @@ def get_hunt_top(period, limit=10):
             """, (limit,))
             return cur.fetchall()
 
+def buy_preview_kb(listing_id: int, user_id: int):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ Закрыть", callback_data=f"buy_preview_close:{user_id}")]
+    ])
 def clear_user_hunt_stats(user_id):
     with get_conn() as conn:
         with conn.cursor() as cur:

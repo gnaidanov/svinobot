@@ -2002,21 +2002,25 @@ def buy_preview_kb(listing_id: int, user_id: int):
     ])
 
 # 1. При перехвате "67" проверяем доступ
-@dp.message(F.text.lower().regexp(r"67"))
+@dp.message(F.text.lower().contains("67"))
 async def photo_quote_reply(msg: Message):
+    if not msg.text:
+        return
+
+    text_lower = msg.text.lower()
+    match = re.search(r"67", text_lower)
+    if not match or not RANDOM_PHOTOS:
+        return
+
+    # Извлекаем слово сразу до проверки доступа, чтобы оно вычислялось для всех веток
+    start_pos = match.start()
+    original_word = msg.text[start_pos : match.end()]
+
     user_id = msg.from_user.id
     chat_id = msg.chat.id
 
     # Если доступ есть — отправляем фото
     if database.has_67_access(user_id, chat_id):
-        text_lower = msg.text.lower()
-        match = re.search(r"67", text_lower)
-        if not match or not RANDOM_PHOTOS:
-            return
-
-        start_pos = match.start()
-        original_word = msg.text[start_pos : match.end()]
-
         try:
             reply_params = ReplyParameters(
                 message_id=msg.message_id,
@@ -2033,7 +2037,7 @@ async def photo_quote_reply(msg: Message):
             await msg.reply_photo(photo=random.choice(RANDOM_PHOTOS))
         return
 
-    # Если доступа НЕТ — отправляем сообщение с кнопкой выборa (Скриншот 1)
+    # Если доступа НЕТ — отправляем сообщение с кнопкой выбора
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⭐ Разблокировать для себя [1 ⭐️]", callback_data="buy_67_user")],
         [InlineKeyboardButton(text="🌟 Разблокировать для чата [67 ⭐️]", callback_data="buy_67_chat")]
@@ -2057,14 +2061,12 @@ async def photo_quote_reply(msg: Message):
             
             msg_link = f"https://t.me/c/{clean_chat_id}/{msg.message_id}"
             
-            # Функция для безопасного текста (чтобы < > & не ломали HTML)
             def safe_html(text):
                 return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
             user_name = safe_html(msg.from_user.full_name)
             chat_title = safe_html(msg.chat.title or "Группа")
             
-            # Формируем текст через HTML
             notification_text = (
                 f"🎯 <b>Бот ответил на слово '{original_word}'</b>\n\n"
                 f"👤 <b>Отправитель:</b> {user_name}\n"
@@ -2075,7 +2077,7 @@ async def photo_quote_reply(msg: Message):
             await bot.send_message(
                 MY_ID, 
                 notification_text, 
-                parse_mode="HTML",  # Переключили на HTML
+                parse_mode="HTML",
                 disable_web_page_preview=False
             )
     except Exception as e:

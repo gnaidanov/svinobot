@@ -2242,7 +2242,7 @@ async def group_message_handler(message: Message):
 
 # ---------- KEEP ALIVE ----------
 async def keep_alive():
-    url = "https://tgbot1.fly.dev/"
+    url = "https://svinobot-6tqf.onrender.com"
     await asyncio.sleep(10)
     
     async with aiohttp.ClientSession() as session:

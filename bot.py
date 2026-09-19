@@ -2002,7 +2002,7 @@ def buy_preview_kb(listing_id: int, user_id: int):
     ])
 
 # 1. При перехвате "67" проверяем доступ
-@dp.message(F.text.lower().contains("67"))
+#@dp.message(F.text.lower().contains("67"))
 async def photo_quote_reply(msg: Message):
     print(">>> РАБОТАЕТ НОВЫЙ ХЭНДЛЕgР 67 <<<")
     if not msg.text:
